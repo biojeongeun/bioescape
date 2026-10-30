@@ -110,6 +110,11 @@ const finalVictoryScreen = document.getElementById('final-victory-screen');
 const victoryStatsBox = document.getElementById('victory-stats-box');
 const restartGameBtn = document.getElementById('restart-game-btn');
 
+const gameOverScreen = document.getElementById('game-over-screen');
+const gameOverReasonText = document.getElementById('gameover-reason-text');
+const retryStage3Btn = document.getElementById('retry-stage3-btn');
+const gameOverRestartBtn = document.getElementById('gameover-restart-btn');
+
 // -------------------------------------------------------------------------
 // Web Audio Synthesizer (외부 오디오 파일 없이 긴장감 넘치는 효과음/심장박동 생성)
 // -------------------------------------------------------------------------
@@ -211,6 +216,28 @@ function playSound(type) {
       crackOsc.connect(crackGain).connect(audioCtx.destination);
       crackOsc.start(now + 0.05);
       crackOsc.stop(now + 0.18);
+    } else if (type === 'gameover') {
+      // 캐릭터가 쓰러질 때 심전도 플랫라인(삐---) + 저음 암전 사운드
+      const flatOsc = audioCtx.createOscillator();
+      const flatGain = audioCtx.createGain();
+      flatOsc.type = 'sine';
+      flatOsc.frequency.setValueAtTime(980, now);
+      flatGain.gain.setValueAtTime(0.14, now);
+      flatGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+      flatOsc.connect(flatGain).connect(audioCtx.destination);
+      flatOsc.start(now);
+      flatOsc.stop(now + 2.25);
+
+      const subOsc = audioCtx.createOscillator();
+      const subGain = audioCtx.createGain();
+      subOsc.type = 'sawtooth';
+      subOsc.frequency.setValueAtTime(110, now);
+      subOsc.frequency.exponentialRampToValueAtTime(32, now + 1.8);
+      subGain.gain.setValueAtTime(0.22, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.9);
+      subOsc.connect(subGain).connect(audioCtx.destination);
+      subOsc.start(now);
+      subOsc.stop(now + 1.95);
     }
   } catch (_) {
     // Ignore audio context restrictions
@@ -797,13 +824,22 @@ const gameState = {
   },
   // Stage 3 서바이벌 수치 (좀비 거리 / 산소 / ATP) 및 시각 효과 상태
   survival: {
-    zombieDist: 85.0, // 0m가 되면 긴급 제세동(페널티 후 거리 소폭 복구)
+    zombieDist: 85.0,
     o2: 96,
     atp: 92,
     wrongCount: 0,
     lastTick: performance.now(),
     lastImpactTime: 0,
     windowImpactFlash: 0,
+  },
+  // GAME OVER 쓰러짐 애니메이션 및 화면 페이드아웃 상태
+  gameOverState: {
+    isDying: false,
+    isDead: false,
+    startTime: 0,
+    collapseProgress: 0, // 0(서 있음) -> 1(바닥에 완전히 쓰러짐)
+    fadeAlpha: 0,        // 0(투명) -> 1(완전 암전 페이드아웃)
+    reason: '',
   },
   nearestStation: null,
   toastTimeout: null,
@@ -1114,13 +1150,14 @@ function submitStationOption(station, selectedOpt) {
     modalFeedback.classList.add('wrong');
     if (gameState.stage === 3) {
       gameState.survival.wrongCount++;
-      gameState.survival.zombieDist = Math.max(8, gameState.survival.zombieDist - 9.5);
-      gameState.survival.o2 = Math.max(15, gameState.survival.o2 - 7);
-      gameState.survival.atp = Math.max(12, gameState.survival.atp - 9);
+      gameState.survival.zombieDist = Math.max(0, gameState.survival.zombieDist - 12.0);
+      gameState.survival.o2 = Math.max(0, gameState.survival.o2 - 12);
+      gameState.survival.atp = Math.max(0, gameState.survival.atp - 14);
       triggerLabImpactShake();
       updateSurvivalHudUI();
       modalFeedback.textContent =
         '⚠️ 오답입니다! 경보음에 반응해 좀비가 창문을 강타하며 연구소가 흔들리고, 산소(O₂)와 ATP가 급격히 소모되었습니다!';
+      checkStage3GameOverCondition();
     } else {
       modalFeedback.textContent =
         '❌ 오답입니다! 모식도와 생명과학 개념을 다시 확인한 뒤 다른 번호를 선택해 보세요.';
@@ -1272,13 +1309,13 @@ function triggerLabImpactShake() {
 }
 
 function updateSurvivalHudUI() {
-  const dist = Math.max(2.5, gameState.survival.zombieDist);
-  const dangerPct = Math.min(98, Math.max(12, ((100 - dist) / 100) * 100));
+  const dist = Math.max(0.0, gameState.survival.zombieDist);
+  const dangerPct = Math.min(100, Math.max(12, ((100 - dist) / 100) * 100));
   zombieBar.style.width = `${dangerPct.toFixed(0)}%`;
   zombieDistText.textContent = `${dist.toFixed(1)}m 접근중`;
 
-  const o2Val = Math.round(gameState.survival.o2);
-  const atpVal = Math.round(gameState.survival.atp);
+  const o2Val = Math.max(0, Math.round(gameState.survival.o2));
+  const atpVal = Math.max(0, Math.round(gameState.survival.atp));
 
   o2Bar.style.width = `${o2Val}%`;
   o2ValText.textContent = `${o2Val}%`;
@@ -1309,9 +1346,67 @@ function updateSurvivalHudUI() {
   }
 }
 
+// 좀비 거리 0.0m 도달 / 잔여 산소 0% / 세포 ATP 0 고갈 시 캐릭터 쓰러짐 & 페이드아웃 GAME OVER 발동
+function checkStage3GameOverCondition() {
+  if (gameState.stage !== 3 || gameState.gameOverState.isDying || gameState.gameOverState.isDead) {
+    return false;
+  }
+
+  let reason = '';
+  if (gameState.survival.zombieDist <= 0.0) {
+    gameState.survival.zombieDist = 0.0;
+    reason = '감염체(좀비)와의 거리가 0.0m가 되어 연구실 격리 방어선이 돌파되었습니다!';
+  } else if (gameState.survival.o2 <= 0) {
+    gameState.survival.o2 = 0;
+    reason = '연구실 내 잔여 산소(O₂)가 0%로 완전히 고갈되어 질식으로 의식을 잃고 쓰러졌습니다!';
+  } else if (gameState.survival.atp <= 0) {
+    gameState.survival.atp = 0;
+    reason = '세포 내 에너지 화폐인 ATP 잔량이 0 mmol로 완전히 고갈되어 생명 활동이 정지했습니다!';
+  } else {
+    return false;
+  }
+
+  updateSurvivalHudUI();
+  closeTerminalModal();
+  playSound('gameover');
+  triggerLabImpactShake();
+
+  gameState.gameOverState.isDying = true;
+  gameState.gameOverState.isDead = false;
+  gameState.gameOverState.startTime = performance.now();
+  gameState.gameOverState.collapseProgress = 0;
+  gameState.gameOverState.fadeAlpha = 0;
+  gameState.gameOverState.reason = reason;
+  gameState.player.targetX = null;
+  gameState.player.targetY = null;
+
+  showToast('🚨 VITAL SIGNAL LOST — 연구원이 쓰러집니다...', 2600);
+  return true;
+}
+
 function tickStage3Survival(now) {
   if (gameState.stage !== 3) return;
   if (!finalVictoryScreen.classList.contains('hidden')) return;
+
+  // 캐릭터가 쓰러지며 화면이 어두워지는(페이드아웃) 연출 진행
+  if (gameState.gameOverState.isDying) {
+    const elapsedDying = (now - gameState.gameOverState.startTime) / 1000;
+    // 0.0초 ~ 1.1초 동안 캐릭터가 바닥으로 90도 쓰러짐
+    gameState.gameOverState.collapseProgress = Math.min(1, elapsedDying / 1.05);
+    // 0.3초 ~ 2.4초 동안 화면이 점점 검게 페이드아웃
+    gameState.gameOverState.fadeAlpha = Math.max(0, Math.min(1, (elapsedDying - 0.25) / 2.0));
+
+    if (elapsedDying >= 2.35 && !gameState.gameOverState.isDead) {
+      gameState.gameOverState.isDead = true;
+      if (gameOverReasonText) {
+        gameOverReasonText.textContent = gameState.gameOverState.reason;
+      }
+      if (gameOverScreen) {
+        gameOverScreen.classList.remove('hidden');
+      }
+    }
+    return;
+  }
 
   // 동아리 학생들이 생물실 밖에서 정확히 40초마다 1번씩(30초~50초 사이의 정중앙 40.0초 주기) 실제 "쾅!" 소리를 맞출 수 있도록 고정 40초 주기 설정!
   if (now - gameState.survival.lastImpactTime >= 40000) {
@@ -1323,9 +1418,9 @@ function tickStage3Survival(now) {
   const elapsedSec = (now - gameState.survival.lastTick) / 1000;
   if (elapsedSec >= 1.2) {
     gameState.survival.lastTick = now;
-    gameState.survival.zombieDist = Math.max(3.5, gameState.survival.zombieDist - 0.65);
-    gameState.survival.o2 = Math.max(15, gameState.survival.o2 - 0.45);
-    gameState.survival.atp = Math.max(15, gameState.survival.atp - 0.52);
+    gameState.survival.zombieDist = Math.max(0.0, gameState.survival.zombieDist - 0.65);
+    gameState.survival.o2 = Math.max(0, gameState.survival.o2 - 0.55);
+    gameState.survival.atp = Math.max(0, gameState.survival.atp - 0.6);
 
     // 산소나 ATP가 낮거나 좀비가 가까울 때 심장박동 사운드 재생
     if (
@@ -1336,19 +1431,8 @@ function tickStage3Survival(now) {
       playSound('heartbeat');
     }
 
-    // 만약 좀비 거리가 4m 이하까지 줄어들면 비상 방어막이 발동하며 긴장감 연출(게임이 막히지 않도록 배려)
-    if (gameState.survival.zombieDist <= 4.0) {
-      playSound('glitch');
-      triggerLabImpactShake();
-      glitchOverlay.classList.remove('hidden');
-      setTimeout(() => glitchOverlay.classList.add('hidden'), 450);
-      gameState.survival.zombieDist = 28.0;
-      gameState.survival.o2 = Math.max(45, gameState.survival.o2);
-      gameState.survival.atp = Math.max(45, gameState.survival.atp);
-      showToast('⚡ 비상 전자기 충격파 가동! 격리문 앞 감염체들을 일시적으로 밀어냈습니다! 서둘러 암호를 푸세요!');
-    }
-
     updateSurvivalHudUI();
+    checkStage3GameOverCondition();
   }
 }
 
@@ -1366,9 +1450,10 @@ function triggerFinalVictory() {
   finalVictoryScreen.classList.remove('hidden');
 }
 
-restartGameBtn.addEventListener('click', () => {
+function resetAllToStage1() {
   document.body.classList.remove('apocalypse-mode');
   finalVictoryScreen.classList.add('hidden');
+  if (gameOverScreen) gameOverScreen.classList.add('hidden');
   stage2Screen.classList.add('hidden');
   stage3Hud.classList.add('hidden');
   stage3SectorIndicator.classList.add('hidden');
@@ -1377,6 +1462,10 @@ restartGameBtn.addEventListener('click', () => {
   gameState.sectorIndex = 0;
   gameState.solvedStations.clear();
   gameState.enteredCode = ['', '', ''];
+  gameState.gameOverState.isDying = false;
+  gameState.gameOverState.isDead = false;
+  gameState.gameOverState.collapseProgress = 0;
+  gameState.gameOverState.fadeAlpha = 0;
   syncCodeSlotsUI();
 
   gameState.player.x = 560;
@@ -1388,17 +1477,50 @@ restartGameBtn.addEventListener('click', () => {
     charSelectScreen.classList.remove('hidden');
   }
   showToast('✨ 다음 참여 학생을 위해 캐릭터 선택 및 STAGE 1 화면으로 초기화되었습니다.');
-});
+}
+
+restartGameBtn.addEventListener('click', resetAllToStage1);
+
+if (gameOverRestartBtn) {
+  gameOverRestartBtn.addEventListener('click', resetAllToStage1);
+}
+
+if (retryStage3Btn) {
+  retryStage3Btn.addEventListener('click', () => {
+    playSound('correct');
+    if (gameOverScreen) gameOverScreen.classList.add('hidden');
+    gameState.gameOverState.isDying = false;
+    gameState.gameOverState.isDead = false;
+    gameState.gameOverState.collapseProgress = 0;
+    gameState.gameOverState.fadeAlpha = 0;
+
+    gameState.survival.zombieDist = 85.0;
+    gameState.survival.o2 = 95;
+    gameState.survival.atp = 92;
+    gameState.survival.lastTick = performance.now();
+    gameState.survival.lastImpactTime = performance.now();
+    updateSurvivalHudUI();
+
+    gameState.player.x = 540;
+    gameState.player.y = 630;
+    gameState.player.targetX = null;
+    gameState.player.targetY = null;
+    showToast('⚡ 응급 소생 완료! 현재 격리 구역에서 다시 탈출을 시도합니다!');
+  });
+}
 
 // -------------------------------------------------------------------------
 // 2.5D 아이소메트릭 렌더링 루프
-// - 배경 일러스트 렌더링
-// - 조사 가능한 장비마다 반짝이는 노란 느낌표(!) 아이콘
-// - 캐릭터가 가까이 가면 장비 바로 위에 검은색 [E] 키캡 배지 혹은 [SPACE]만 깔끔하게 표시
-// - 메이플스토리/쿼터뷰 RPG 감성의 귀여운 연구원 캐릭터 스프라이트
 // -------------------------------------------------------------------------
 function updatePlayerMovement() {
-  if (!terminalModal.classList.contains('hidden') || gameState.stage === 2) return;
+  if (
+    !terminalModal.classList.contains('hidden') ||
+    gameState.stage === 2 ||
+    gameState.gameOverState.isDying ||
+    gameState.gameOverState.isDead
+  ) {
+    return;
+  }
 
   let dx = 0;
   let dy = 0;
@@ -1698,15 +1820,27 @@ function drawLPCPixelResearcher(targetCtx, cx, footY, gender, dir, walkFrame, is
 
 function drawPlayerSprite(p, time) {
   const isMoving =
-    p.targetX !== null ||
-    keysPressed['w'] ||
-    keysPressed['a'] ||
-    keysPressed['s'] ||
-    keysPressed['d'] ||
-    keysPressed['arrowup'] ||
-    keysPressed['arrowdown'] ||
-    keysPressed['arrowleft'] ||
-    keysPressed['arrowright'];
+    !gameState.gameOverState.isDying &&
+    (p.targetX !== null ||
+      keysPressed['w'] ||
+      keysPressed['a'] ||
+      keysPressed['s'] ||
+      keysPressed['d'] ||
+      keysPressed['arrowup'] ||
+      keysPressed['arrowdown'] ||
+      keysPressed['arrowleft'] ||
+      keysPressed['arrowright']);
+
+  ctx.save();
+  // GAME OVER 시 캐릭터가 발밑을 축으로 스르륵 옆으로 쓰러지는 모션
+  if (gameState.gameOverState.isDying || gameState.gameOverState.isDead) {
+    const prog = gameState.gameOverState.collapseProgress;
+    // easeOutQuad 회전으로 바닥에 90도 쓰러짐
+    const angle = (1 - Math.pow(1 - prog, 2)) * (Math.PI / 2);
+    ctx.translate(p.x, p.y);
+    ctx.rotate(angle);
+    ctx.translate(-p.x, -p.y);
+  }
 
   drawLPCPixelResearcher(
     ctx,
@@ -1719,6 +1853,7 @@ function drawPlayerSprite(p, time) {
     gameState.stage === 3,
     3.1
   );
+  ctx.restore();
 }
 
 // 캐릭터 선택 창 미리보기 캔버스 렌더링
@@ -1924,12 +2059,21 @@ function renderGame(now) {
   }
 
   // 5) 캐릭터가 가까이가면 장비 바로 위에 검은색 [E] 키캡 배지 혹은 [SPACE]만 깔끔하게 표시
-  if (gameState.nearestStation) {
+  if (gameState.nearestStation && !gameState.gameOverState.isDying) {
     drawMinimalKeycapBadge(
       gameState.nearestStation.x,
       gameState.nearestStation.y - 26,
       now
     );
+  }
+
+  // 6) GAME OVER 시 캐릭터가 쓰러지면서 화면이 점점 어두워지는(페이드아웃) 암전 오버레이
+  if (gameState.gameOverState.isDying || gameState.gameOverState.isDead) {
+    const fade = gameState.gameOverState.fadeAlpha;
+    if (fade > 0.01) {
+      ctx.fillStyle = `rgba(3, 1, 2, ${fade.toFixed(3)})`;
+      ctx.fillRect(-50, -50, canvas.width + 100, canvas.height + 100);
+    }
   }
 
   ctx.restore();

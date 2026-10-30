@@ -165,6 +165,21 @@
         <button id="restart-game-btn">처음부터 다시 플레이 (다음 손님용 초기화)</button>
       </div>
     </div>
+
+    <!-- GAME OVER 화면 (좀비 거리 0.0m 도달 / 산소 0% / 세포 ATP 0 고갈 시 캐릭터 쓰러짐 & 페이드아웃 후 표시) -->
+    <div id="game-over-screen" class="hidden">
+      <div class="gameover-card">
+        <div class="gameover-badge">BIO-SIGNAL LOST // VITAL FLATLINE</div>
+        <h1 class="gameover-title">GAME OVER</h1>
+        <p id="gameover-reason-text" class="gameover-reason">
+          잔여 산소 또는 세포 ATP가 완전히 고갈되어 연구원이 의식을 잃고 쓰러졌습니다.
+        </p>
+        <div class="gameover-btn-group">
+          <button type="button" id="retry-stage3-btn">현재 격리 구역 다시 도전하기</button>
+          <button type="button" id="gameover-restart-btn" class="secondary-btn">처음부터 다시 시작 (STAGE 1)</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="game.js"></script>

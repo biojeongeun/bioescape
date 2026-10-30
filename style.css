@@ -966,6 +966,107 @@ body.apocalypse-mode .modal-hint-box {
   letter-spacing: 0.08em;
 }
 
+/* =====================================================
+   GAME OVER 화면 스타일
+   ===================================================== */
+#game-over-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(35, 4, 9, 0.94) 0%, rgba(2, 1, 2, 0.99) 100%);
+  padding: 20px;
+  animation: fadeInSlow 0.8s ease forwards;
+}
+
+@keyframes fadeInSlow {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.gameover-card {
+  max-width: 560px;
+  width: 100%;
+  background: rgba(18, 4, 8, 0.96);
+  border: 2px solid #ef4444;
+  border-radius: 20px;
+  padding: 38px 32px;
+  text-align: center;
+  box-shadow: 0 0 65px rgba(239, 68, 68, 0.45);
+}
+
+.gameover-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  color: #fca5a5;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 0.8rem;
+  border-radius: 99px;
+  margin-bottom: 14px;
+}
+
+.gameover-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ef4444;
+  text-shadow: 0 0 24px rgba(239, 68, 68, 0.85);
+  margin-bottom: 14px;
+}
+
+.gameover-reason {
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: #fecdd3;
+  margin-bottom: 26px;
+}
+
+.gameover-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#retry-stage3-btn {
+  padding: 14px 24px;
+  background: linear-gradient(90deg, #dc2626, #e11d48);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#retry-stage3-btn:hover {
+  background: linear-gradient(90deg, #b91c1c, #be123c);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
+}
+
+#gameover-restart-btn {
+  padding: 11px 20px;
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#gameover-restart-btn:hover {
+  border-color: #fde047;
+  color: #fef08a;
+}
+
 .hidden {
   display: none !important;
 }
