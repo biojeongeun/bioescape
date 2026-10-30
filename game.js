@@ -16,8 +16,6 @@ const slotInputs = [
 const stage3Hud = document.getElementById('stage3-survival-hud');
 const stage3SectorIndicator = document.getElementById('stage3-sector-indicator');
 const sectorNameBadge = document.getElementById('sector-name-badge');
-const flashlightToggleBtn = document.getElementById('flashlight-toggle-btn');
-const canvasWrapper = document.getElementById('canvas-wrapper');
 const zombieBar = document.getElementById('zombie-bar');
 const zombieDistText = document.getElementById('zombie-dist-text');
 const o2Bar = document.getElementById('o2-bar');
@@ -131,31 +129,6 @@ function playSound(type) {
       osc.connect(gain).connect(audioCtx.destination);
       osc.start(now);
       osc.stop(now + 0.21);
-    } else if (type === 'window_thud') {
-      // 감염체가 강화유리창을 "쿵! 쿵!" 두드리는 둔탁한 저음 충격파 사운드
-      [0, 0.24].forEach((offset) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(88, now + offset);
-        osc.frequency.exponentialRampToValueAtTime(26, now + offset + 0.21);
-        gain.gain.setValueAtTime(0.34, now + offset);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.22);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(now + offset);
-        osc.stop(now + offset + 0.23);
-      });
-    } else if (type === 'spark') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(420, now);
-      osc.frequency.linearRampToValueAtTime(140, now + 0.08);
-      gain.gain.setValueAtTime(0.09, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-      osc.connect(gain).connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.095);
     }
   } catch (_) {
     // Ignore audio context restrictions
@@ -170,114 +143,6 @@ bgStage1.src = 'assets/stage1_bright.jpg';
 
 const bgStage3 = new Image();
 bgStage3.src = 'assets/stage3_apocalypse.jpg';
-
-// -------------------------------------------------------------------------
-// 실제 사람 비율(8등신 실사 3D) 하얀 연구원 가운 캐릭터 이미지 로드 & 배경 투명화(Flood-fill Keying)
-// -------------------------------------------------------------------------
-const rawResearcherImg = new Image();
-let researcherSpriteCanvas = null;
-
-rawResearcherImg.onload = () => {
-  const offCanvas = document.createElement('canvas');
-  const w = rawResearcherImg.naturalWidth;
-  const h = rawResearcherImg.naturalHeight;
-  offCanvas.width = w;
-  offCanvas.height = h;
-  const offCtx = offCanvas.getContext('2d');
-  offCtx.drawImage(rawResearcherImg, 0, 0);
-
-  const imgData = offCtx.getImageData(0, 0, w, h);
-  const data = imgData.data;
-  const visited = new Uint8Array(w * h);
-  const queue = new Int32Array(w * h);
-  let head = 0;
-  let tail = 0;
-
-  function isBgPixel(idx) {
-    const p = idx * 4;
-    const r = data[p];
-    const g = data[p + 1];
-    const b = data[p + 2];
-    return r < 24 && g < 24 && b < 24;
-  }
-
-  // 이미지 테두리 픽셀에서 시작해 외곽 검은 배경만 안전하게 제거 (검은 바지/신발/머리카락 내부 보존)
-  for (let x = 0; x < w; x++) {
-    const topIdx = x;
-    const botIdx = (h - 1) * w + x;
-    if (isBgPixel(topIdx)) { visited[topIdx] = 1; queue[tail++] = topIdx; }
-    if (isBgPixel(botIdx)) { visited[botIdx] = 1; queue[tail++] = botIdx; }
-  }
-  for (let y = 0; y < h; y++) {
-    const leftIdx = y * w;
-    const rightIdx = y * w + (w - 1);
-    if (!visited[leftIdx] && isBgPixel(leftIdx)) { visited[leftIdx] = 1; queue[tail++] = leftIdx; }
-    if (!visited[rightIdx] && isBgPixel(rightIdx)) { visited[rightIdx] = 1; queue[tail++] = rightIdx; }
-  }
-
-  while (head < tail) {
-    const curr = queue[head++];
-    data[curr * 4 + 3] = 0; // 완전 투명 처리
-
-    const cx = curr % w;
-    const cy = (curr / w) | 0;
-
-    const neighbors = [];
-    if (cx > 0) neighbors.push(curr - 1);
-    if (cx < w - 1) neighbors.push(curr + 1);
-    if (cy > 0) neighbors.push(curr - w);
-    if (cy < h - 1) neighbors.push(curr + w);
-
-    for (let i = 0; i < neighbors.length; i++) {
-      const nIdx = neighbors[i];
-      if (!visited[nIdx]) {
-        if (isBgPixel(nIdx)) {
-          visited[nIdx] = 1;
-          queue[tail++] = nIdx;
-        } else {
-          // 캐릭터 외곽선 안티앨리어싱 부드럽게 감쇠
-          const p = nIdx * 4;
-          const lum = (data[p] + data[p + 1] + data[p + 2]) / 3;
-          if (lum < 42) {
-            data[p + 3] = Math.min(data[p + 3], Math.round(((lum - 18) / 24) * 255));
-          }
-        }
-      }
-    }
-  }
-
-  offCtx.putImageData(imgData, 0, 0);
-
-  // 여백을 잘라내고 캐릭터 알맹이(Bounding Box)만 추출
-  let minX = w, minY = h, maxX = 0, maxY = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 20) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-
-  if (maxX > minX && maxY > minY) {
-    const cropW = maxX - minX + 1;
-    const cropH = maxY - minY + 1;
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = cropW;
-    cropCanvas.height = cropH;
-    cropCanvas.getContext('2d').drawImage(
-      offCanvas,
-      minX, minY, cropW, cropH,
-      0, 0, cropW, cropH
-    );
-    researcherSpriteCanvas = cropCanvas;
-  } else {
-    researcherSpriteCanvas = offCanvas;
-  }
-};
-rawResearcherImg.src = 'assets/researcher_realistic.jpg';
 
 // -------------------------------------------------------------------------
 // 아이소메트릭 방 바닥 이동 가능 다각형 및 중앙 실험대 투명 히트박스(충돌영역)
@@ -854,14 +719,7 @@ const gameState = {
     atp: 92,
     wrongCount: 0,
     lastTick: performance.now(),
-    lastThudTime: 0,
   },
-  // 공포 연출 상태 (손전등 암전 시야 제한, 마우스 조준점, 유리창 충격 균열, 비상등 깜빡임)
-  flashlightEnabled: true,
-  mouseX: 640,
-  mouseY: 360,
-  windowImpactFlash: 0,
-  emergencyFlickerAlpha: 0,
   nearestStation: null,
   toastTimeout: null,
 };
@@ -979,38 +837,6 @@ function canMoveTo(nx, ny) {
 // -------------------------------------------------------------------------
 // 키보드 및 마우스(클릭 이동/상호작용) 이벤트
 // -------------------------------------------------------------------------
-// 손전등 암전 모드 토글 함수 (우측 상단 버튼 또는 단축키 F)
-function toggleFlashlightMode() {
-  if (gameState.stage !== 3) return;
-  playSound('interact');
-  gameState.flashlightEnabled = !gameState.flashlightEnabled;
-  if (gameState.flashlightEnabled) {
-    flashlightToggleBtn.textContent = '🔦 손전등 해제 [F]';
-    flashlightToggleBtn.classList.remove('off-mode');
-    showToast('🔦 손전등 암전 시야 모드가 켜졌습니다.');
-  } else {
-    flashlightToggleBtn.textContent = '💡 손전등 켜기 [F]';
-    flashlightToggleBtn.classList.add('off-mode');
-    showToast('💡 손전등 암전 시야 제한을 해제하여 연구실 전체 시야를 확보했습니다.');
-  }
-}
-
-if (flashlightToggleBtn) {
-  flashlightToggleBtn.addEventListener('click', toggleFlashlightMode);
-}
-
-// 좀비가 강화유리창을 두드리는 충격 연출 (화면 흔들림 + 둔탁한 타격음 + 유리창 균열 플래시)
-function triggerZombieWindowThud() {
-  playSound('window_thud');
-  gameState.windowImpactFlash = 1.0;
-  canvasWrapper.classList.remove('window-thud-shake');
-  void canvasWrapper.offsetWidth; // reflow
-  canvasWrapper.classList.add('window-thud-shake');
-  setTimeout(() => {
-    canvasWrapper.classList.remove('window-thud-shake');
-  }, 520);
-}
-
 window.addEventListener('keydown', (e) => {
   // 모달이 열려 있을 때
   if (!terminalModal.classList.contains('hidden')) {
@@ -1030,12 +856,6 @@ window.addEventListener('keydown', (e) => {
 
   if (gameState.stage === 2) return;
 
-  if (e.key.toLowerCase() === 'f' && gameState.stage === 3) {
-    e.preventDefault();
-    toggleFlashlightMode();
-    return;
-  }
-
   keysPressed[e.key.toLowerCase()] = true;
 
   if (e.key.toLowerCase() === 'e' || e.key === ' ') {
@@ -1044,15 +864,6 @@ window.addEventListener('keydown', (e) => {
       triggerStationInteraction(gameState.nearestStation);
     }
   }
-});
-
-// 마우스 움직임에 따라 손전등 조사 방향 업데이트
-canvas.addEventListener('mousemove', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  gameState.mouseX = (e.clientX - rect.left) * scaleX;
-  gameState.mouseY = (e.clientY - rect.top) * scaleY;
 });
 
 window.addEventListener('keyup', (e) => {
@@ -1183,9 +994,8 @@ function submitStationOption(station, selectedOpt) {
       gameState.survival.zombieDist = Math.max(8, gameState.survival.zombieDist - 9.5);
       gameState.survival.atp = Math.max(12, gameState.survival.atp - 8);
       updateSurvivalHudUI();
-      triggerZombieWindowThud();
       modalFeedback.textContent =
-        '⚠️ 오답입니다! 경보음에 반응해 외부 감염체가 강화유리창을 강하게 내리치며 거리가 좁혀졌습니다!';
+        '⚠️ 오답입니다! 경보음에 반응해 외부 좀비와의 거리가 가까워지고 ATP가 소모되었습니다. 모식도의 조건을 다시 확인하세요!';
     } else {
       modalFeedback.textContent =
         '❌ 오답입니다! 모식도와 생명과학 개념을 다시 확인한 뒤 다른 번호를 선택해 보세요.';
@@ -1303,12 +1113,6 @@ function triggerStage2GlitchTransition() {
     stage3SectorIndicator.classList.remove('hidden');
     sectorNameBadge.textContent = getCurrentSectorData().sectorTitle;
 
-    gameState.flashlightEnabled = true;
-    if (flashlightToggleBtn) {
-      flashlightToggleBtn.textContent = '🔦 손전등 해제 [F]';
-      flashlightToggleBtn.classList.remove('off-mode');
-    }
-
     gameState.survival.zombieDist = 85.0;
     gameState.survival.o2 = 95;
     gameState.survival.atp = 92;
@@ -1355,23 +1159,6 @@ function tickStage3Survival(now) {
       playSound('heartbeat');
     }
 
-    // 좀비와의 거리가 가까워질수록 강화유리창을 "쿵! 쿵!" 두드리는 진동 기믹 발생
-    if (
-      gameState.survival.zombieDist < 58 &&
-      now - gameState.survival.lastThudTime > 7500 &&
-      Math.random() < 0.36
-    ) {
-      gameState.survival.lastThudTime = now;
-      triggerZombieWindowThud();
-      showToast('💥 쾅! 쾅! — 외부 감염체가 중앙 강화유리창을 두드리고 있습니다!', 2400);
-    }
-
-    // 불규칙적인 비상 형광등 스파크/깜빡임 효과
-    if (Math.random() < 0.24) {
-      gameState.emergencyFlickerAlpha = 0.35 + Math.random() * 0.45;
-      if (Math.random() < 0.35) playSound('spark');
-    }
-
     // 만약 좀비 거리가 4m 이하까지 줄어들면 비상 방어막이 발동하며 긴장감 연출(게임이 막히지 않도록 배려)
     if (gameState.survival.zombieDist <= 4.0) {
       playSound('glitch');
@@ -1410,7 +1197,6 @@ restartGameBtn.addEventListener('click', () => {
 
   gameState.stage = 1;
   gameState.sectorIndex = 0;
-  gameState.flashlightEnabled = true;
   gameState.solvedStations.clear();
   gameState.enteredCode = ['', '', ''];
   syncCodeSlotsUI();
@@ -1572,169 +1358,75 @@ function drawMinimalKeycapBadge(x, y, time) {
   ctx.restore();
 }
 
-// 실제 사람 비율(8등신 실사 3D) 하얀 연구원복 캐릭터 렌더링
+// 2.5D RPG 연구원 캐릭터(하얀 실험 가운 + 보안 고글) 렌더링
 function drawPlayerSprite(p, time) {
-  const isMoving =
-    p.targetX !== null ||
-    keysPressed['w'] ||
-    keysPressed['a'] ||
-    keysPressed['s'] ||
-    keysPressed['d'] ||
-    keysPressed['arrowup'] ||
-    keysPressed['arrowdown'] ||
-    keysPressed['arrowleft'] ||
-    keysPressed['arrowright'];
-
-  const bob = isMoving
-    ? Math.abs(Math.sin(p.walkFrame * 1.8)) * -5.5
-    : Math.sin(time * 0.0035) * 1.5;
-
-  const tilt = isMoving ? Math.sin(p.walkFrame * 1.8) * 0.032 : 0;
+  const bob = (p.targetX !== null || keysPressed['w'] || keysPressed['a'] || keysPressed['s'] || keysPressed['d'] || keysPressed['arrowup'] || keysPressed['arrowdown'] || keysPressed['arrowleft'] || keysPressed['arrowright'])
+    ? Math.sin(p.walkFrame * 2) * 3.5
+    : Math.sin(time * 0.004) * 1.5;
 
   const px = p.x;
   const py = p.y;
 
   ctx.save();
 
-  // 1) 바닥 리얼 소프트 그림자
-  const shadowGrad = ctx.createRadialGradient(px, py + 2, 4, px, py + 2, 34);
-  shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.72)');
-  shadowGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.32)');
-  shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = shadowGrad;
+  // 발밑 그림자 (아이소메트릭 타원)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.beginPath();
-  ctx.ellipse(px, py + 2, 32, 12, 0, 0, Math.PI * 2);
+  ctx.ellipse(px, py + 4, 20, 9, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2) Stage 3에서는 연구원 손목 바이오워치/랜턴의 은은한 바닥 반사광 추가
+  // Stage 3에서는 플레이어 주변 손전등/바이오랜턴 후광 추가
   if (gameState.stage === 3) {
-    const glowGrad = ctx.createRadialGradient(px, py - 65, 6, px, py - 65, 95);
-    glowGrad.addColorStop(0, 'rgba(56, 189, 248, 0.18)');
-    glowGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-    ctx.fillStyle = glowGrad;
+    const grad = ctx.createRadialGradient(px, py - 24, 10, px, py - 24, 130);
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+    grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(px, py - 65, 95, 0, Math.PI * 2);
+    ctx.arc(px, py - 24, 130, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 3) 8등신 실사 연구원 스프라이트 렌더링 (높이 약 168px로 연구실 비율과 완벽 조화)
-  if (researcherSpriteCanvas) {
-    const targetH = 168;
-    const aspect = researcherSpriteCanvas.width / researcherSpriteCanvas.height;
-    const targetW = targetH * aspect;
+  // 다리/신발
+  const legSwing = Math.sin(p.walkFrame * 2) * 4;
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(px - 9, py - 12 + (bob > 0 ? legSwing : 0), 7, 13);
+  ctx.fillRect(px + 2, py - 12 - (bob > 0 ? legSwing : 0), 7, 13);
 
-    ctx.translate(px, py + bob);
-    ctx.rotate(tilt);
-
-    // 원본 캐릭터는 좌측 전방을 바라보므로, 오른쪽 이동 시 좌우 반전
-    if (p.dir === 'right') {
-      ctx.scale(-1, 1);
-    }
-
-    ctx.drawImage(
-      researcherSpriteCanvas,
-      -targetW / 2,
-      -targetH + 6,
-      targetW,
-      targetH
-    );
-  }
-
-  ctx.restore();
-}
-
-// STAGE 3 전용: 유리창 너머 감염체 실루엣 & 유리창 타격 균열 효과 렌더링
-function drawStage3WindowHorrorEffects(now) {
-  if (gameState.stage !== 3) return;
-
-  ctx.save();
-  // 좀비 거리가 가까워질수록 중앙 관찰창(x: 390~820, y: 175~390) 너머에 손자국/실루엣 농도 증가
-  const proximityRatio = Math.max(0, Math.min(1, (85 - gameState.survival.zombieDist) / 75));
-
-  if (proximityRatio > 0.15) {
-    const silhouetteAlpha = 0.18 + proximityRatio * 0.45 + Math.sin(now * 0.004) * 0.06;
-    ctx.fillStyle = `rgba(5, 2, 4, ${silhouetteAlpha.toFixed(3)})`;
-
-    // 유리창에 바짝 다가온 감염체 그림자 실루엣 3구
-    const silhouettes = [
-      { x: 465, y: 335, scale: 0.9 + proximityRatio * 0.25 },
-      { x: 695, y: 340, scale: 0.85 + proximityRatio * 0.3 },
-      { x: 760, y: 345, scale: 0.8 + proximityRatio * 0.22 },
-    ];
-    for (const s of silhouettes) {
-      const sway = Math.sin(now * 0.003 + s.x) * 4;
-      ctx.beginPath();
-      ctx.arc(s.x + sway, s.y - 36 * s.scale, 13 * s.scale, 0, Math.PI * 2);
-      ctx.ellipse(s.x + sway, s.y, 22 * s.scale, 34 * s.scale, 0, Math.PI, 0, true);
-      ctx.fill();
-    }
-  }
-
-  // 좀비가 유리창을 두드렸을 때 붉은 충격파 및 유리 거미줄 균열 강조
-  if (gameState.windowImpactFlash > 0.01) {
-    const alpha = gameState.windowImpactFlash;
-    ctx.strokeStyle = `rgba(255, 220, 225, ${(alpha * 0.85).toFixed(2)})`;
-    ctx.shadowColor = '#f43f5e';
-    ctx.shadowBlur = 18;
-    ctx.lineWidth = 2.2;
-
-    const cx = 485;
-    const cy = 285;
-    const rays = [
-      [-55, -45], [65, -35], [48, 52], [-62, 40], [12, -68], [-25, 65], [82, 12],
-    ];
-    ctx.beginPath();
-    for (const [rx, ry] of rays) {
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + rx * 0.5, cy + ry * 0.4);
-      ctx.lineTo(cx + rx, cy + ry);
-    }
-    ctx.stroke();
-
-    gameState.windowImpactFlash *= 0.92;
-  }
-
-  // 비상 형광등 스파크 깜빡임 (순간 암전/적색 플래시)
-  if (gameState.emergencyFlickerAlpha > 0.02) {
-    ctx.fillStyle = `rgba(4, 0, 2, ${gameState.emergencyFlickerAlpha.toFixed(2)})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    gameState.emergencyFlickerAlpha *= 0.84;
-  }
-
-  ctx.restore();
-}
-
-// STAGE 3 전용: 칠흑 같은 손전등(Flashlight) 암전 시야 제한 마스크
-function drawStage3FlashlightDarkness(now) {
-  if (gameState.stage !== 3 || !gameState.flashlightEnabled) return;
-
-  const px = gameState.player.x;
-  const py = gameState.player.y - 84;
-
-  // 플레이어 위치와 마우스 커서 위치를 보간해 자연스러운 손전등 조사 중심점 생성
-  const aimX = px + (gameState.mouseX - px) * 0.38;
-  const aimY = py + (gameState.mouseY - py) * 0.38;
-
-  ctx.save();
-  // 화면 전체를 어둡게 덮되, 손전등 중심부만 투명하게 뚫리는 다중 라디얼 그라데이션
-  const flashGrad = ctx.createRadialGradient(aimX, aimY, 45, aimX, aimY, 275);
-  flashGrad.addColorStop(0, 'rgba(0, 0, 0, 0.02)');
-  flashGrad.addColorStop(0.45, 'rgba(8, 12, 18, 0.35)');
-  flashGrad.addColorStop(0.78, 'rgba(4, 5, 10, 0.86)');
-  flashGrad.addColorStop(1, 'rgba(2, 2, 5, 0.965)');
-
-  ctx.fillStyle = flashGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // 손전등 불빛 내부의 미세한 먼지/안개 볼류메트릭 림 라이트
-  const beamGlow = ctx.createRadialGradient(aimX, aimY, 10, aimX, aimY, 230);
-  beamGlow.addColorStop(0, 'rgba(254, 249, 195, 0.11)');
-  beamGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.05)');
-  beamGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = beamGlow;
+  // 하얀 실험 가운 몸통
+  ctx.fillStyle = '#f8fafc';
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(aimX, aimY, 230, 0, Math.PI * 2);
+  ctx.roundRect(px - 14, py - 38 + bob, 28, 28, 7);
   ctx.fill();
+  ctx.stroke();
+
+  // 가운 안쪽 청록색 바이오 셔츠 & 사원증
+  ctx.fillStyle = gameState.stage === 3 ? '#f43f5e' : '#0284c7';
+  ctx.fillRect(px - 4, py - 36 + bob, 8, 16);
+  ctx.fillStyle = '#fde047';
+  ctx.fillRect(px + 5, py - 29 + bob, 5, 6);
+
+  // 머리 (2D 도트/SD RPG 비율)
+  ctx.fillStyle = '#fde68a';
+  ctx.beginPath();
+  ctx.arc(px, py - 50 + bob, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 머리카락
+  ctx.fillStyle = '#1e1b4b';
+  ctx.beginPath();
+  ctx.arc(px, py - 54 + bob, 15.5, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.fill();
+
+  // 사이버 연구 고글 (방향에 따라 시선 이동)
+  const eyeOffsetX = p.dir === 'left' ? -4 : p.dir === 'right' ? 4 : 0;
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(px - 11 + eyeOffsetX, py - 53 + bob, 22, 7);
+  ctx.fillStyle = gameState.stage === 3 ? '#34d399' : '#38bdf8';
+  ctx.fillRect(px - 8 + eyeOffsetX, py - 51.5 + bob, 6, 4);
+  ctx.fillRect(px + 2 + eyeOffsetX, py - 51.5 + bob, 6, 4);
 
   ctx.restore();
 }
@@ -1745,33 +1437,27 @@ function renderGame(now) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 1) 초고화질 실사풍 아이소메트릭 배경 이미지 렌더링
+  // 1) 아이소메트릭 배경 이미지 렌더링
   const bgImg = gameState.stage === 3 ? bgStage3 : bgStage1;
   if (bgImg.complete && bgImg.naturalWidth > 0) {
     ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
   } else {
-    ctx.fillStyle = '#090d16';
+    ctx.fillStyle = '#111827';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  // 2) STAGE 3 유리창 감염체 실루엣 & 유리 타격 균열 & 비상등 깜빡임 연출
-  drawStage3WindowHorrorEffects(now);
-
   const sector = getCurrentSectorData();
 
-  // 3) 플레이어 캐릭터(생물안전 방호복 연구원) 렌더링
+  // 2) 플레이어 캐릭터 렌더링
   drawPlayerSprite(gameState.player, now);
 
-  // 4) STAGE 3 손전등 암전 시야 제한 레이어 (느낌표 아이콘보다 아래에 그려 어둠 속에서도 느낌표가 반짝이게 함)
-  drawStage3FlashlightDarkness(now);
-
-  // 5) 조사 가능한 실험 장비마다 반짝이는 노란 느낌표 (!) 아이콘 렌더링
+  // 3) 조사 가능한 실험 장비마다 반짝이는 노란 느낌표 (!) 아이콘 렌더링
   for (const st of sector.stations) {
     const isSolved = gameState.solvedStations.has(st.id);
     drawExclamationIcon(st.x, st.y - 26, isSolved, !!st.isExitDoor, now);
   }
 
-  // 6) 캐릭터가 가까이가면 장비 바로 위에 검은색 [E] 키캡 배지 혹은 [SPACE]만 깔끔하게 표시
+  // 4) 캐릭터가 가까이가면 장비 바로 위에 검은색 [E] 키캡 배지 혹은 [SPACE]만 깔끔하게 표시
   if (gameState.nearestStation) {
     drawMinimalKeycapBadge(
       gameState.nearestStation.x,
