@@ -1,0 +1,9 @@
+{
+  "name": "bioescape",
+  "version": "1.0.0",
+  "private": true,
+  "description": "High School Biology RPG Isometric 2.5D Escape Room Game",
+  "scripts": {
+    "start": "npx serve ."
+  }
+}

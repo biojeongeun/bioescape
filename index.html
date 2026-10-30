@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIO-LAB ESCAPE : 생명과학 연구소 RPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-viewport">
+    <!-- 최상단 중앙 고정: 반투명 슬롯형 보안코드 입력줄만 미니멀하게 고정 -->
+    <div id="top-security-bar" title="클릭하거나 숫자를 입력해 보안코드를 시험할 수 있습니다">
+      <span class="security-label">보안코드</span>
+      <div class="code-slots">
+        <input type="text" maxlength="1" class="code-slot" id="slot-0" data-index="0" placeholder="_" autocomplete="off" />
+        <input type="text" maxlength="1" class="code-slot" id="slot-1" data-index="1" placeholder="_" autocomplete="off" />
+        <input type="text" maxlength="1" class="code-slot" id="slot-2" data-index="2" placeholder="_" autocomplete="off" />
+      </div>
+    </div>
+
+    <!-- STAGE 3 전용: 좀비 거리 / 잔여 산소(O2) / 잔여 ATP 서바이벌 오버레이 (인게임 HUD) -->
+    <div id="stage3-survival-hud" class="hidden">
+      <div class="hud-metric danger-pulse">
+        <span class="hud-tag">ZOMBIE PROXIMITY</span>
+        <div class="hud-bar-wrap">
+          <div id="zombie-bar" class="hud-bar zombie-fill" style="width: 15%;"></div>
+        </div>
+        <span id="zombie-dist-text" class="hud-val">85.0m 접근중</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-tag">O₂ 잔여 산소</span>
+        <div class="hud-bar-wrap">
+          <div id="o2-bar" class="hud-bar o2-fill" style="width: 92%;"></div>
+        </div>
+        <span id="o2-val-text" class="hud-val">92%</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-tag">세포 ATP 잔량</span>
+        <div class="hud-bar-wrap">
+          <div id="atp-bar" class="hud-bar atp-fill" style="width: 88%;"></div>
+        </div>
+        <span id="atp-val-text" class="hud-val">88 mmol</span>
+      </div>
+    </div>
+
+    <!-- STAGE 3 방(구역) 이동 인게임 미니 탭 (격리 구역 3개 룸 전환) -->
+    <div id="stage3-sector-indicator" class="hidden">
+      <span id="sector-name-badge">SECTOR A : 대사·신경 격리실</span>
+    </div>
+
+    <!-- 메인 2.5D 아이소메트릭 캔버스 컨테이너 -->
+    <div id="canvas-wrapper">
+      <canvas id="game-canvas" width="1280" height="720"></canvas>
+      <!-- 레드 얼럿/글리치 비네팅 오버레이 -->
+      <div id="atmosphere-overlay"></div>
+      <div id="glitch-overlay" class="hidden"></div>
+      <!-- 인게임 토스트 (짧은 상태 알림) -->
+      <div id="ingame-toast" class="hidden"></div>
+    </div>
+
+    <!-- 인게임 실험 장비 조사 / 문제 풀이 모니터 오버레이 (단말기 화면) -->
+    <div id="terminal-modal" class="hidden">
+      <div class="terminal-window" id="terminal-window-box">
+        <div class="terminal-header">
+          <div class="terminal-title-group">
+            <span class="terminal-dot"></span>
+            <span id="modal-station-tag">BIO-STATION #01</span>
+          </div>
+          <span class="terminal-close-key" id="modal-close-btn">[ESC] 닫기</span>
+        </div>
+        <div class="terminal-body">
+          <div class="curriculum-badge-row">
+            <span id="modal-subject-badge" class="subject-badge">통합과학 · 세포와 물질대사</span>
+            <span id="modal-slot-target" class="slot-target-badge">보안코드 1번째 자리 단서</span>
+          </div>
+          <h2 id="modal-title">광학 현미경 & 삼투압 분석기</h2>
+          <div id="modal-lore" class="modal-lore"></div>
+          <div id="modal-diagram" class="modal-diagram"></div>
+          <div id="modal-question" class="modal-question"></div>
+          <div id="modal-options" class="modal-options"></div>
+          <div id="modal-feedback" class="modal-feedback hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 2 : 생물실 선물 교환 코드 입력 화면 (평화로운 축하 화면 -> 입력 순간 글리치 공포 반전!) -->
+    <div id="stage2-screen" class="hidden">
+      <div class="stage2-card" id="stage2-card-box">
+        <div class="stage2-confetti-badge">🎉 STAGE 1 CLEAR — 연구소 안전 점검 완료!</div>
+        <h1>생물실 선물 교환소</h1>
+        <p class="stage2-desc">
+          축하합니다! 평화로운 생명과학 연구소의 모든 기초 점검을 마쳤습니다.<br/>
+          방금 연구소에서 획득한 <strong>선물 교환 코드 [ <span id="stage2-earned-code">423</span> ]</strong> 또는 동아리 부스 안내원의 <strong>생물실 선물 코드</strong>를 아래에 입력하면 등급에 맞는 선물을 드립니다!
+        </p>
+        <div class="gift-input-group">
+          <input type="text" id="gift-code-input" maxlength="6" placeholder="선물 코드 입력 (예: 423)" autocomplete="off" />
+          <button id="gift-submit-btn">선물 교환하기</button>
+        </div>
+        <p class="stage2-subhint">※ 부스 안내 학생에게 화면을 보여주거나 코드를 입력하고 [Enter]를 누르세요.</p>
+      </div>
+
+      <!-- 글리치 반전 시퀀스 텍스트 오버레이 -->
+      <div id="glitch-sequence-screen" class="hidden">
+        <div class="glitch-alert-box">
+          <div class="glitch-warning-code">SYSTEM ERROR // ERR_PRION_OUTBREAK_0x99</div>
+          <h2 id="glitch-Dynamic-Text">선물 교환 서버 연결 중... 치명적 오류 발생!</h2>
+          <p id="glitch-Sub-Text">외부 도시 전역에서 변이 신경 바이러스(Z-프리온) 확산 감지. 생물실 격리 셔터가 강제 폐쇄됩니다!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 최종 탈출 성공 화면 (STAGE 3 올클리어) -->
+    <div id="final-victory-screen" class="hidden">
+      <div class="victory-card">
+        <div class="victory-badge">BIO-HAZARD SURVIVOR // ESCAPE COMPLETE</div>
+        <h1>격리 구역 최종 탈출 성공!</h1>
+        <p id="victory-summary-text">
+          다가오는 감염체들의 포위망을 뚫고 고난도 생명과학·유전·최신 바이오 지식으로 모든 격리 구역 보안코드를 해독했습니다!
+        </p>
+        <div class="victory-stats" id="victory-stats-box"></div>
+        <div class="victory-reward-box">
+          <span>최종 생존 인증 코드</span>
+          <strong id="final-survivor-code">ATP-739-OMEGA</strong>
+          <small>생물실 부스 운영 동아리원에게 이 인증 화면을 보여주세요!</small>
+        </div>
+        <button id="restart-game-btn">처음부터 다시 플레이 (다음 손님용 초기화)</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

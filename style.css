@@ -1,0 +1,733 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #0c1017;
+  color: #e2e8f0;
+  font-family: 'Noto Sans KR', sans-serif;
+  overflow: hidden;
+}
+
+#game-viewport {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #16202e 0%, #070a0f 100%);
+}
+
+body.apocalypse-mode #game-viewport {
+  background: radial-gradient(circle at center, #1c0c10 0%, #050304 100%);
+}
+
+/* =====================================================
+   최상단 중앙 고정 반투명 슬롯형 암호 입력줄
+   보안코드 [ _ ] [ _ ] [ _ ] 미니멀 고정
+   ===================================================== */
+#top-security-bar {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 20px;
+  background: rgba(10, 15, 25, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 15px rgba(56, 189, 248, 0.2);
+  transition: all 0.35s ease;
+}
+
+body.apocalypse-mode #top-security-bar {
+  background: rgba(20, 6, 10, 0.78);
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.8), 0 0 18px rgba(244, 63, 94, 0.3);
+}
+
+.security-label {
+  font-family: 'JetBrains Mono', 'Noto Sans KR', monospace;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  color: #7dd3fc;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
+body.apocalypse-mode .security-label {
+  color: #fda4af;
+  text-shadow: 0 0 8px rgba(244, 63, 94, 0.65);
+}
+
+.code-slots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.code-slot {
+  width: 40px;
+  height: 42px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1.5px solid rgba(125, 211, 252, 0.5);
+  border-radius: 8px;
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.code-slot:focus {
+  border-color: #fde047;
+  box-shadow: 0 0 12px rgba(253, 224, 71, 0.55);
+  transform: translateY(-1px);
+}
+
+.code-slot.solved {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: rgba(20, 83, 45, 0.45);
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.35);
+}
+
+body.apocalypse-mode .code-slot {
+  background: rgba(28, 10, 14, 0.88);
+  border-color: rgba(251, 113, 133, 0.5);
+}
+
+body.apocalypse-mode .code-slot.solved {
+  border-color: #34d399;
+  color: #34d399;
+  background: rgba(6, 78, 59, 0.55);
+}
+
+/* =====================================================
+   STAGE 3 전용 서바이벌 HUD (좀비 거리 / 산소 / ATP)
+   ===================================================== */
+#stage3-survival-hud {
+  position: fixed;
+  top: 18px;
+  left: 22px;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 14px;
+  background: rgba(18, 6, 9, 0.78);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  min-width: 245px;
+}
+
+.hud-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', 'Noto Sans KR', monospace;
+}
+
+.hud-tag {
+  width: 96px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.danger-pulse .hud-tag {
+  color: #fb7185;
+  animation: textPulse 1.2s infinite alternate;
+}
+
+.hud-bar-wrap {
+  flex: 1;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.hud-bar {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.35s ease;
+}
+
+.zombie-fill {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.o2-fill {
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+}
+
+.atp-fill {
+  background: linear-gradient(90deg, #10b981, #a3e635);
+}
+
+.hud-val {
+  width: 72px;
+  text-align: right;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+#stage3-sector-indicator {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  z-index: 45;
+  padding: 8px 16px;
+  background: rgba(18, 6, 9, 0.8);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', 'Noto Sans KR', monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #6ee7b7;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+}
+
+/* =====================================================
+   캔버스 래퍼 & 분위기 효과
+   ===================================================== */
+#canvas-wrapper {
+  position: relative;
+  width: min(100vw, 177.78vh);
+  height: min(56.25vw, 100vh);
+  max-width: 1536px;
+  max-height: 864px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#atmosphere-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: background 0.6s ease, box-shadow 0.6s ease;
+}
+
+body.apocalypse-mode #atmosphere-overlay {
+  background: radial-gradient(circle at 50% 50%, transparent 48%, rgba(12, 2, 4, 0.72) 100%);
+  box-shadow: inset 0 0 70px rgba(220, 38, 38, 0.28);
+  animation: emergencyPulse 3.2s infinite ease-in-out;
+}
+
+@keyframes emergencyPulse {
+  0%, 100% { box-shadow: inset 0 0 55px rgba(220, 38, 38, 0.18); }
+  50% { box-shadow: inset 0 0 95px rgba(220, 38, 38, 0.46); }
+}
+
+@keyframes textPulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; text-shadow: 0 0 8px #f43f5e; }
+}
+
+/* 글리치 이펙트 */
+#glitch-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 0, 55, 0.16) 0px,
+    rgba(0, 255, 200, 0.14) 2px,
+    transparent 4px,
+    rgba(0, 0, 0, 0.45) 6px
+  );
+  mix-blend-mode: hard-light;
+  animation: glitchFlicker 0.12s infinite;
+}
+
+@keyframes glitchFlicker {
+  0% { transform: translate(0, 0); opacity: 0.9; }
+  25% { transform: translate(-6px, 3px) skewX(2deg); opacity: 0.75; }
+  50% { transform: translate(5px, -4px) skewX(-2deg); opacity: 1; }
+  75% { transform: translate(-3px, -2px); opacity: 0.65; }
+  100% { transform: translate(4px, 2px); opacity: 0.9; }
+}
+
+/* 인게임 토스트 */
+#ingame-toast {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  padding: 10px 22px;
+  background: rgba(10, 15, 28, 0.9);
+  border: 1.5px solid #fde047;
+  border-radius: 10px;
+  color: #fef08a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+
+/* =====================================================
+   인게임 실험 단말기 문제 풀이 모달
+   ===================================================== */
+#terminal-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(4, 8, 15, 0.74);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.terminal-window {
+  width: 100%;
+  max-width: 720px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: rgba(13, 21, 36, 0.96);
+  border: 2px solid #38bdf8;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), 0 0 30px rgba(56, 189, 248, 0.25);
+  color: #f1f5f9;
+}
+
+body.apocalypse-mode .terminal-window {
+  background: rgba(20, 9, 14, 0.96);
+  border-color: #f43f5e;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.92), 0 0 35px rgba(244, 63, 94, 0.3);
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: rgba(30, 41, 59, 0.85);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+body.apocalypse-mode .terminal-header {
+  background: rgba(45, 12, 20, 0.88);
+  border-bottom-color: rgba(244, 63, 94, 0.4);
+}
+
+.terminal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #38bdf8;
+}
+
+body.apocalypse-mode .terminal-title-group {
+  color: #fb7185;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+body.apocalypse-mode .terminal-dot {
+  background: #f43f5e;
+  box-shadow: 0 0 8px #f43f5e;
+}
+
+.terminal-close-key {
+  padding: 4px 10px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.terminal-close-key:hover {
+  border-color: #fde047;
+  color: #fde047;
+}
+
+.terminal-body {
+  padding: 22px 24px;
+}
+
+.curriculum-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.subject-badge {
+  padding: 4px 10px;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+body.apocalypse-mode .subject-badge {
+  background: rgba(244, 63, 94, 0.16);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #fda4af;
+}
+
+.slot-target-badge {
+  padding: 4px 10px;
+  background: rgba(250, 204, 21, 0.15);
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fde047;
+}
+
+#modal-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+.modal-lore {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.65);
+  padding: 12px 15px;
+  border-left: 3px solid #38bdf8;
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+body.apocalypse-mode .modal-lore {
+  background: rgba(30, 10, 16, 0.7);
+  border-left-color: #f43f5e;
+}
+
+.modal-diagram {
+  background: rgba(9, 13, 22, 0.9);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin-bottom: 14px;
+  font-family: 'JetBrains Mono', 'Noto Sans KR', monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: #a5f3fc;
+  white-space: pre-wrap;
+}
+
+body.apocalypse-mode .modal-diagram {
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.modal-question {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  color: #fef08a;
+}
+
+.modal-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 15px;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1.5px solid rgba(148, 163, 184, 0.3);
+  border-radius: 9px;
+  color: #f1f5f9;
+  font-size: 0.93rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.option-item:hover {
+  border-color: #fde047;
+  background: rgba(51, 65, 85, 0.9);
+  transform: translateX(4px);
+}
+
+.option-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 7px;
+  background: #0f172a;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #fde047;
+}
+
+.modal-feedback {
+  margin-top: 14px;
+  padding: 12px 15px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.modal-feedback.correct {
+  background: rgba(20, 83, 45, 0.7);
+  border: 1px solid #4ade80;
+  color: #bbf7d0;
+}
+
+.modal-feedback.wrong {
+  background: rgba(127, 29, 29, 0.75);
+  border: 1px solid #f87171;
+  color: #fecaca;
+}
+
+/* =====================================================
+   STAGE 2 : 생물실 선물 교환 코드 화면 & 글리치 반전
+   ===================================================== */
+#stage2-screen,
+#final-victory-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(224, 242, 254, 0.95) 0%, rgba(186, 230, 253, 0.98) 100%);
+  color: #0f172a;
+  padding: 20px;
+}
+
+#final-victory-screen {
+  background: radial-gradient(circle at center, rgba(6, 38, 30, 0.95) 0%, rgba(4, 12, 18, 0.98) 100%);
+  color: #f8fafc;
+}
+
+.stage2-card {
+  max-width: 580px;
+  width: 100%;
+  background: #ffffff;
+  border: 2px solid #38bdf8;
+  border-radius: 20px;
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(2, 132, 199, 0.25);
+}
+
+.stage2-confetti-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 800;
+  font-size: 0.85rem;
+  border-radius: 99px;
+  margin-bottom: 14px;
+}
+
+.stage2-card h1 {
+  font-size: 1.85rem;
+  font-weight: 900;
+  color: #0c4a6e;
+  margin-bottom: 12px;
+}
+
+.stage2-desc {
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: #334155;
+  margin-bottom: 24px;
+}
+
+.gift-input-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+#gift-code-input {
+  width: 210px;
+  padding: 12px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-align: center;
+  border: 2px solid #7dd3fc;
+  border-radius: 10px;
+  outline: none;
+  color: #0f172a;
+}
+
+#gift-code-input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.3);
+}
+
+#gift-submit-btn,
+#restart-game-btn {
+  padding: 12px 24px;
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#gift-submit-btn:hover,
+#restart-game-btn:hover {
+  background: #0369a1;
+}
+
+.stage2-subhint {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+/* 글리치 반전 연출 박스 */
+#glitch-sequence-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: #090204;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.glitch-alert-box {
+  max-width: 680px;
+  padding: 36px;
+  background: rgba(35, 4, 10, 0.92);
+  border: 2px solid #f43f5e;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(244, 63, 94, 0.6);
+  animation: glitchFlicker 0.18s infinite;
+}
+
+.glitch-warning-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  color: #fda4af;
+  letter-spacing: 0.12em;
+  margin-bottom: 12px;
+}
+
+.glitch-alert-box h2 {
+  font-size: 1.75rem;
+  color: #ffffff;
+  margin-bottom: 14px;
+  text-shadow: 2px 0 #f43f5e, -2px 0 #06b6d4;
+}
+
+.glitch-alert-box p {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: #fecdd3;
+}
+
+/* 승리 카드 */
+.victory-card {
+  max-width: 600px;
+  width: 100%;
+  background: rgba(15, 23, 42, 0.95);
+  border: 2px solid #34d399;
+  border-radius: 20px;
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: 0 0 50px rgba(16, 185, 129, 0.35);
+}
+
+.victory-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 0.82rem;
+  border-radius: 99px;
+  margin-bottom: 14px;
+}
+
+.victory-card h1 {
+  font-size: 1.9rem;
+  color: #ecfdf5;
+  margin-bottom: 12px;
+}
+
+.victory-reward-box {
+  margin: 22px 0;
+  padding: 18px;
+  background: rgba(6, 78, 59, 0.5);
+  border: 1.5px dashed #34d399;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.victory-reward-box strong {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.7rem;
+  color: #fde047;
+  letter-spacing: 0.08em;
+}
+
+.hidden {
+  display: none !important;
+}
