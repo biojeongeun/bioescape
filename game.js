@@ -32,6 +32,9 @@ const modalTitle = document.getElementById('modal-title');
 const modalLore = document.getElementById('modal-lore');
 const modalDiagram = document.getElementById('modal-diagram');
 const modalQuestion = document.getElementById('modal-question');
+const modalHintArea = document.getElementById('modal-hint-area');
+const modalHintBtn = document.getElementById('modal-hint-btn');
+const modalHintBox = document.getElementById('modal-hint-box');
 const modalOptions = document.getElementById('modal-options');
 const modalFeedback = document.getElementById('modal-feedback');
 
@@ -195,6 +198,7 @@ const STAGE_DATA = {
 • 소기관 (나): 포도당 + O₂ → CO₂ + H₂O + 다량의 ATP (크리스테 & 기질)
 • 효소(카탈레이스) 실험: 과산화 수소(H₂O₂) → 물(H₂O) + 산소(O₂) (활성화 에너지 감소)`,
         question: 'Q1. 위 발광 모식도에 대한 설명으로 옳은 것만을 모두 고른 번호(보안코드 1번째 숫자)는?',
+        hint: '💡 [연구 노트 힌트] (가)는 광합성이 일어나는 엽록체(식물만 보유), (나)는 세포 호흡이 일어나는 미토콘드리아입니다. 효소는 활성화 에너지를 "낮추며", 엽록체와 미토콘드리아는 모두 외막·내막의 [2중막] 구조이고 자체 DNA와 리보솜을 가집니다!',
         options: [
           { num: '1', text: '① (가)는 동물 세포와 식물 세포에 모두 존재한다.' },
           { num: '2', text: '② (나)에서 합성된 ATP는 생명 활동에 쓰이지 않고 모두 열로만 방출된다.' },
@@ -226,6 +230,7 @@ const STAGE_DATA = {
 • 용액 B (체액과 같은 0.9% NaCl): 물의 유입량 = 유출량 (부피 일정)
 • 용액 C (체액보다 높은 농도): 식물세포에서 세포벽과 세포막이 분리됨(원형질 분리)`,
         question: 'Q2. 세포막을 통한 물질 이동에 대한 설명으로 옳은 번호(보안코드 2번째 숫자)를 고르시오.',
+        hint: '💡 [연구 노트 힌트] 확산(단순 확산·촉진 확산)은 모두 고농도→저농도로 이동하므로 ATP가 소모되지 않습니다! 특히 산소(O₂)와 이산화 탄소(CO₂) 같은 작은 기체 분자는 막단백질 없이 [인지질 2중층을 직접 통과(단순 확산)]합니다.',
         options: [
           { num: '1', text: '① 용액 A는 적혈구 내부보다 삼투압이 높은 고장액이다.' },
           { num: '2', text: '② 산소(O₂)와 이산화 탄소(CO₂)는 세포막의 인지질 2중층을 통해 직접 단순 확산된다. [정답 → 코드 2]' },
@@ -257,6 +262,7 @@ const STAGE_DATA = {
 • 전사된 mRNA 염기서열   : 5' - A U G C C G U A A G G U - 3'
 • 조건: 개시 코돈은 AUG이며, 종결 코돈(UAA, UAG, UGA)은 아미노산을 지정하지 않음.`,
         question: 'Q3. 위 mRNA가 리보솜에서 번역될 때, 종결 코돈에 의해 번역이 멈추기 전까지 합성되는 펩타이드를 구성하는 아미노산의 개수는 몇 개인가? (단, 메싸이오닌이 제거되지 않는다고 가정하며, 정답 번호가 보안코드 3번째 숫자)',
+        hint: '💡 [연구 노트 힌트] mRNA 염기를 3개씩(코돈 단위로) 끊어 읽어보세요: [AUG] - [CCG] - [UAA] - [GGU]. 첫 번째 AUG와 두 번째 CCG는 아미노산을 지정하지만, 세 번째 [UAA]는 종결 코돈이라 아미노산을 지정하지 않고 번역이 끝납니다! (총 아미노산 2개 → 선지 ③번)',
         options: [
           { num: '1', text: '① 1개 (AUG만 번역됨)' },
           { num: '2', text: '② 4개 (모든 코돈이 아미노산을 지정함)' },
@@ -334,6 +340,7 @@ const STAGE_DATA = {
 • 구간 Ⅱ (재분극): K⁺ 통로 열림 → K⁺이 세포 밖으로 유출 (막전위 하강)
 • Na⁺-K⁺ 펌프: ATP를 소모하여 Na⁺을 세포 밖으로, K⁺을 세포 안으로 능동 수송`,
           question: 'Q1. 신경 세포의 흥분 전도와 시냅스 전달에 대한 설명으로 옳은 번호(보안코드 1번째 숫자)는?',
+          hint: '💡 [연구 노트 힌트] K⁺ 농도는 항상 세포 안이 밖보다 높고, 이온 통로를 통한 Na⁺·K⁺ 이동은 확산이므로 ATP가 직접 쓰이지 않습니다. 반면 축삭돌기 말단에서 시냅스 소포가 세포막과 융합해 신경전달물질을 분비하는 [세포외배출] 과정에는 ATP가 사용됩니다!',
           options: [
             { num: '1', text: '① 휴지 전위 상태에서 K⁺의 농도는 항상 세포 밖이 세포 안보다 높다.' },
             { num: '2', text: '② 탈분극 시 Na⁺이 통로를 통해 세포 안으로 들어올 때 다량의 ATP가 직접 소모된다.' },
@@ -365,6 +372,7 @@ const STAGE_DATA = {
 2) 피루브산 산화 & TCA 회로 (미토콘드리아 기질): NADH, FADH₂, CO₂, 기질수준 인산화(ATP) 생성
 3) 산화적 인산화 (미토콘드리아 내막): 전자전달계를 거쳐 최종 전자 수용체인 O₂가 전자와 H⁺을 받아 H₂O 생성`,
           question: 'Q2. 미토콘드리아의 세포 호흡과 ATP 합성에 대한 설명으로 옳은 번호(보안코드 2번째 숫자)는?',
+          hint: '💡 [연구 노트 힌트] 미토콘드리아 내막의 전자전달계에서 전자를 최종적으로 받는 수용체는 [산소(O₂)]입니다! 이때 미토콘드리아 기질에서 막사이 공간으로 퍼낸 H⁺ 농도 기울기를 이용해 ATP 합성 효소에서 다량의 ATP가 합성됩니다.',
           options: [
             { num: '1', text: '① 해당 과정은 미토콘드리아 기질에서 일어나며 산소(O₂)가 직접 소모된다.' },
             { num: '2', text: '② 전자전달계가 작동할 때 H⁺은 막사이 공간에서 미토콘드리아 기질로 능동 수송된다.' },
@@ -395,6 +403,7 @@ const STAGE_DATA = {
 • 1차 침입: 보조 T 림프구 활성화 → B 림프구가 형질세포와 기억세포로 분화 (잠복기 후 항체 생성)
 • 2차 침입: 동일 항원 X 재침입 시 [ (가) 세포 ]가 빠르게 형질세포로 분화하여 단시간에 다량의 항체 생성`,
           question: 'Q3. 인체의 특이적 방어 작용에 대한 설명으로 옳은 번호(보안코드 3번째 숫자)는?',
+          hint: '💡 [연구 노트 힌트] B 림프구가 형질세포로 분화해 항체를 만드는 것은 체액성 면역이고, 활성화된 [세포독성 T 림프구]가 바이러스에 감염된 세포를 직접 파괴하는 것은 세포성 면역입니다!',
           options: [
             { num: '1', text: '① 형질세포는 다시 기억세포로 분화하여 반영구적으로 체내에 남는다.' },
             { num: '2', text: '② 세포독성 T 림프구는 바이러스에 감염된 세포를 직접 파괴하는 세포성 면역을 담당한다. [정답 → 코드 2]' },
@@ -469,6 +478,7 @@ const STAGE_DATA = {
 • 감수 2분열 중기 세포 1개당 염색체 수 = b 개
 • 암호 계산식 : (a + b)의 값 = ?`,
           question: 'Q1. 2n = 6인 동물에서 감수 1분열 중기 세포 1개당 관찰되는 [2가 염색체의 수(a)]와 감수 2분열 중기 세포 1개당 [염색체 수(b)]를 더한 값(a + b)은 얼마인가? (정답 숫자가 보안코드 1번째 자리)',
+          hint: '💡 [연구 노트 힌트] 2n = 6이므로 상동 염색체가 3쌍입니다. 감수 1분열 중기에는 상동 염색체끼리 접합한 [2가 염색체]가 3개(a=3) 관찰되고, 감수 2분열 중기에는 핵상이 n=3이므로 염색체가 3개(b=3) 들어 있습니다. 따라서 a + b = 3 + 3 = 6입니다!',
           options: [
             { num: '3', text: '① 3 (a=1, b=2)' },
             { num: '4', text: '② 4 (a=2, b=2)' },
@@ -500,6 +510,7 @@ const STAGE_DATA = {
 • 부모 (아버지: 정상 표현형, 어머니: 정상 표현형) 사이에서 [유전병을 가진 아들]이 태어남.
 • 단, 아버지는 유전병 대립유전자를 전혀 가지고 있지 않음(DNA 상대량 = 0).`,
           question: 'Q2. 위 가계도 단서에 대한 분석으로 옳은 번호(보안코드 2번째 숫자)를 고르시오.',
+          hint: '💡 [연구 노트 힌트] "정상 부모 사이에서 유전병 자녀 출생 → 유전병은 열성!" 또한 아버지가 유전병 대립유전자를 전혀 안 가졌는데도 유전병 아들이 태어났다면, 아들은 아버지에게 Y를 받고 어머니에게 유전병 유전자가 있는 [X 염색체]를 물려받은 것입니다!',
           options: [
             { num: '1', text: '① 이 유전병 형질은 정상에 대해 우성 형질이다.' },
             { num: '2', text: '② 이 유전병 유전자는 상염색체에 존재한다.' },
@@ -532,6 +543,7 @@ const STAGE_DATA = {
 • 태어난 자녀 ㉠: 클라인펠터 증후군(44 + XXY)이면서 동시에 [적록 색맹(X'X'Y)]을 나타냄!
   (단, 염색체 비분리는 부모 중 한 사람의 생식세포 형성 과정에서만 1회 일어남)`,
           question: 'Q3. 위 자녀 ㉠(X\'X\'Y, 적록 색맹)이 태어난 원인으로 가장 타당한 번호(보안코드 3번째 숫자)는?',
+          hint: '💡 [연구 노트 힌트] 아버지는 정상(XY)이라 색맹 대립유전자(X\')가 아예 없습니다! 따라서 자녀(X\'X\'Y)가 가진 2개의 X\'는 모두 보인자 어머니(XX\')에게서 온 것이며, 동일한 X\'가 2개 들어갔으므로 어머니의 [감수 2분열]에서 염색분체 비분리가 일어난 것입니다!',
           options: [
             { num: '1', text: '① 아버지의 감수 1분열에서 성염색체 비분리가 일어났다.' },
             { num: '2', text: '② 아버지의 감수 2분열에서 Y 염색체 비분리가 일어났다.' },
@@ -585,6 +597,7 @@ const STAGE_DATA = {
 • 구성 1 [가이드 RNA (gRNA)] : 표적 DNA의 특정 염기서열과 상보적으로 결합하여 위치를 안내함
 • 구성 2 [Cas9 단백질] : 표적 위치의 DNA 이중 가닥을 절단하는 핵산가수분해효소(가위 역할)`,
           question: 'Q1. 최신 유전자 편집 기술인 CRISPR-Cas9에 대한 설명으로 옳은 번호(보안코드 1번째 숫자)는?',
+          hint: '💡 [연구 노트 힌트] 크리스퍼 유전자 가위에서 [가이드 RNA(gRNA)]는 표적 DNA 염기서열과 상보적으로 결합해 길잡이(안내) 역할을 하고, 실제로 DNA 사슬을 자르는 가위 역할은 [Cas9 단백질 효소]가 담당합니다!',
           options: [
             { num: '1', text: '① 가이드 RNA(gRNA)가 직접 DNA의 인산디에스테르 결합을 가수분해하여 절단한다.' },
             { num: '2', text: '② 가이드 RNA가 표적 DNA 서열과 상보적으로 결합해 위치를 안내하고, Cas9 효소가 DNA를 절단한다. [정답 → 코드 2]' },
@@ -615,6 +628,7 @@ const STAGE_DATA = {
 • 2023 노벨 생리의학상: 변형 뉴클레오사이드(슈도유리딘 등)를 이용해 염증 반응을 줄인 mRNA 백신 개발
 • 2024 노벨 생리의학상: 빅터 앰브로스 & 개리 러브컨 — 작은 비번역 RNA인 [마이크로RNA(miRNA)]를 발견하여 다세포 생물의 [전사 후(post-transcriptional) 유전자 발현 조절] 원리 규명`,
           question: 'Q2. 마이크로RNA(miRNA)와 mRNA 백신에 대한 최신 생명과학 지식으로 옳은 번호(보안코드 2번째 숫자)는?',
+          hint: '💡 [연구 노트 힌트] 2024 노벨 생리의학상을 수상한 [마이크로RNA(miRNA)]는 그 자체가 단백질로 번역되지 않는 작은 비번역 RNA입니다. 표적 mRNA에 상보적으로 결합하여 리보솜의 번역을 막거나 mRNA를 분해해 유전자 발현을 조절합니다!',
           options: [
             { num: '1', text: '① 마이크로RNA(miRNA)는 리보솜에서 직접 거대한 구조 단백질로 번역되어 근육을 구성한다.' },
             { num: '2', text: '② mRNA 백신은 숙주 세포의 핵 속으로 들어가 사람의 유전체 DNA에 영구적으로 삽입되어야만 작동한다.' },
@@ -647,6 +661,7 @@ const STAGE_DATA = {
 3단계: 신장 (약 72℃) — 내열성 Taq DNA 중합효소에 의해 새로운 DNA 가닥 합성
 ★ 문제 계산: 처음 주형 이중가닥 DNA 1분자를 넣고 PCR을 정확히 3회(3 사이클) 반복했을 때 생성되는 총 이중가닥 DNA 분자 수는? (2³ = ?)`,
           question: 'Q3. 이중가닥 DNA 1분자를 주형으로 하여 이상적인 조건에서 PCR(변성→결합→신장)을 3사이클 완료했을 때 얻어지는 총 이중가닥 DNA 분자 수는 몇 개인가? (정답 숫자가 최종 보안코드 3번째 자리!)',
+          hint: '💡 [연구 노트 힌트] PCR은 1사이클마다 이중가닥 DNA가 2배씩 복제(2^n)됩니다. 1사이클 후 2개 → 2사이클 후 4개 → 3사이클 후에는 2³ = [ 8개 ]가 됩니다! (선지 ④번의 정답 숫자 8이 보안코드 세 번째 자리입니다)',
           options: [
             { num: '3', text: '① 3개' },
             { num: '4', text: '② 4개 (2²)' },
@@ -827,6 +842,9 @@ window.addEventListener('keydown', (e) => {
   if (!terminalModal.classList.contains('hidden')) {
     if (e.key === 'Escape') {
       closeTerminalModal();
+    } else if (e.key.toLowerCase() === 'h' && gameState.activeStation && gameState.activeStation.hint) {
+      e.preventDefault();
+      toggleStationHint();
     } else if (['1', '2', '3', '4', '5'].includes(e.key) && gameState.activeStation) {
       const st = gameState.activeStation;
       if (st.options && st.options.length >= Number(e.key)) {
@@ -915,6 +933,16 @@ function triggerStationInteraction(station) {
   modalFeedback.classList.add('hidden');
   modalOptions.innerHTML = '';
 
+  if (station.hint) {
+    modalHintArea.classList.remove('hidden');
+    modalHintBox.textContent = station.hint;
+    modalHintBox.classList.add('hidden');
+    modalHintBtn.textContent = '💡 연구 노트 힌트 보기 [H]';
+  } else {
+    modalHintArea.classList.add('hidden');
+    modalHintBox.classList.add('hidden');
+  }
+
   if (station.options && station.options.length > 0) {
     station.options.forEach((opt, idx) => {
       const btn = document.createElement('button');
@@ -974,6 +1002,21 @@ function submitStationOption(station, selectedOpt) {
     }
   }
 }
+
+function toggleStationHint() {
+  if (!gameState.activeStation || !gameState.activeStation.hint) return;
+  playSound('interact');
+  const isHidden = modalHintBox.classList.contains('hidden');
+  if (isHidden) {
+    modalHintBox.classList.remove('hidden');
+    modalHintBtn.textContent = '💡 연구 노트 힌트 접기 [H]';
+  } else {
+    modalHintBox.classList.add('hidden');
+    modalHintBtn.textContent = '💡 연구 노트 힌트 보기 [H]';
+  }
+}
+
+modalHintBtn.addEventListener('click', toggleStationHint);
 
 function closeTerminalModal() {
   terminalModal.classList.add('hidden');
