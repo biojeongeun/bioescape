@@ -3,3 +3,6 @@
 node_modules
 .dorms-check*
 *.log
+
+.vercel
+.env*
