@@ -23,26 +23,29 @@
 
     <!-- STAGE 3 전용: 좀비 거리 / 잔여 산소(O2) / 잔여 ATP 서바이벌 오버레이 (인게임 HUD) -->
     <div id="stage3-survival-hud" class="hidden">
-      <div class="hud-metric danger-pulse">
+      <div class="hud-metric danger-pulse" id="zombie-metric-row">
         <span class="hud-tag">ZOMBIE PROXIMITY</span>
         <div class="hud-bar-wrap">
           <div id="zombie-bar" class="hud-bar zombie-fill" style="width: 15%;"></div>
         </div>
         <span id="zombie-dist-text" class="hud-val">85.0m 접근중</span>
       </div>
-      <div class="hud-metric">
+      <div class="hud-metric" id="o2-metric-row">
         <span class="hud-tag">O₂ 잔여 산소</span>
         <div class="hud-bar-wrap">
           <div id="o2-bar" class="hud-bar o2-fill" style="width: 92%;"></div>
         </div>
         <span id="o2-val-text" class="hud-val">92%</span>
       </div>
-      <div class="hud-metric">
+      <div class="hud-metric" id="atp-metric-row">
         <span class="hud-tag">세포 ATP 잔량</span>
         <div class="hud-bar-wrap">
           <div id="atp-bar" class="hud-bar atp-fill" style="width: 88%;"></div>
         </div>
         <span id="atp-val-text" class="hud-val">88 mmol</span>
+      </div>
+      <div id="bio-vital-warning" class="bio-vital-warning hidden">
+        ⚠️ HYPOXIA / ATP DEPLETION : 생체 에너지 위험!
       </div>
     </div>
 

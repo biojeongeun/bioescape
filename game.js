@@ -16,12 +16,16 @@ const slotInputs = [
 const stage3Hud = document.getElementById('stage3-survival-hud');
 const stage3SectorIndicator = document.getElementById('stage3-sector-indicator');
 const sectorNameBadge = document.getElementById('sector-name-badge');
+const canvasWrapper = document.getElementById('canvas-wrapper');
 const zombieBar = document.getElementById('zombie-bar');
 const zombieDistText = document.getElementById('zombie-dist-text');
+const o2MetricRow = document.getElementById('o2-metric-row');
 const o2Bar = document.getElementById('o2-bar');
 const o2ValText = document.getElementById('o2-val-text');
+const atpMetricRow = document.getElementById('atp-metric-row');
 const atpBar = document.getElementById('atp-bar');
 const atpValText = document.getElementById('atp-val-text');
+const bioVitalWarning = document.getElementById('bio-vital-warning');
 
 const terminalModal = document.getElementById('terminal-modal');
 const modalStationTag = document.getElementById('modal-station-tag');
@@ -129,6 +133,30 @@ function playSound(type) {
       osc.connect(gain).connect(audioCtx.destination);
       osc.start(now);
       osc.stop(now + 0.21);
+    } else if (type === 'window_crack') {
+      // 감염체가 유리창을 "쾅!" 내리치며 금이 가는 둔탁한 충격음 + 고주파 유리 균열음
+      [0, 0.22].forEach((offset) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(92, now + offset);
+        osc.frequency.exponentialRampToValueAtTime(28, now + offset + 0.2);
+        gain.gain.setValueAtTime(0.32, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.21);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.22);
+      });
+      const crackOsc = audioCtx.createOscillator();
+      const crackGain = audioCtx.createGain();
+      crackOsc.type = 'sawtooth';
+      crackOsc.frequency.setValueAtTime(1450, now + 0.05);
+      crackOsc.frequency.exponentialRampToValueAtTime(380, now + 0.16);
+      crackGain.gain.setValueAtTime(0.09, now + 0.05);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      crackOsc.connect(crackGain).connect(audioCtx.destination);
+      crackOsc.start(now + 0.05);
+      crackOsc.stop(now + 0.18);
     }
   } catch (_) {
     // Ignore audio context restrictions
@@ -712,13 +740,15 @@ const gameState = {
     targetY: null,
     pendingStation: null,
   },
-  // Stage 3 서바이벌 수치 (좀비 거리 / 산소 / ATP)
+  // Stage 3 서바이벌 수치 (좀비 거리 / 산소 / ATP) 및 시각 효과 상태
   survival: {
     zombieDist: 85.0, // 0m가 되면 긴급 제세동(페널티 후 거리 소폭 복구)
     o2: 96,
     atp: 92,
     wrongCount: 0,
     lastTick: performance.now(),
+    lastImpactTime: 0,
+    windowImpactFlash: 0,
   },
   nearestStation: null,
   toastTimeout: null,
@@ -992,10 +1022,12 @@ function submitStationOption(station, selectedOpt) {
     if (gameState.stage === 3) {
       gameState.survival.wrongCount++;
       gameState.survival.zombieDist = Math.max(8, gameState.survival.zombieDist - 9.5);
-      gameState.survival.atp = Math.max(12, gameState.survival.atp - 8);
+      gameState.survival.o2 = Math.max(15, gameState.survival.o2 - 7);
+      gameState.survival.atp = Math.max(12, gameState.survival.atp - 9);
+      triggerLabImpactShake();
       updateSurvivalHudUI();
       modalFeedback.textContent =
-        '⚠️ 오답입니다! 경보음에 반응해 외부 좀비와의 거리가 가까워지고 ATP가 소모되었습니다. 모식도의 조건을 다시 확인하세요!';
+        '⚠️ 오답입니다! 경보음에 반응해 좀비가 창문을 강타하며 연구소가 흔들리고, 산소(O₂)와 ATP가 급격히 소모되었습니다!';
     } else {
       modalFeedback.textContent =
         '❌ 오답입니다! 모식도와 생명과학 개념을 다시 확인한 뒤 다른 번호를 선택해 보세요.';
@@ -1131,17 +1163,56 @@ giftCodeInput.addEventListener('keydown', (e) => {
 // -------------------------------------------------------------------------
 // STAGE 3 서바이벌 타이머 (좀비 접근 & 산소/ATP 변화)
 // -------------------------------------------------------------------------
+// 좀비가 접근하며 창문을 강타할 때 연구소 화면 흔들림 & 균열 충격 효과
+function triggerLabImpactShake() {
+  playSound('window_crack');
+  gameState.survival.windowImpactFlash = 1.0;
+  if (canvasWrapper) {
+    canvasWrapper.classList.remove('lab-impact-shake');
+    void canvasWrapper.offsetWidth;
+    canvasWrapper.classList.add('lab-impact-shake');
+    setTimeout(() => {
+      canvasWrapper.classList.remove('lab-impact-shake');
+    }, 520);
+  }
+}
+
 function updateSurvivalHudUI() {
   const dist = Math.max(2.5, gameState.survival.zombieDist);
   const dangerPct = Math.min(98, Math.max(12, ((100 - dist) / 100) * 100));
   zombieBar.style.width = `${dangerPct.toFixed(0)}%`;
   zombieDistText.textContent = `${dist.toFixed(1)}m 접근중`;
 
-  o2Bar.style.width = `${Math.round(gameState.survival.o2)}%`;
-  o2ValText.textContent = `${Math.round(gameState.survival.o2)}%`;
+  const o2Val = Math.round(gameState.survival.o2);
+  const atpVal = Math.round(gameState.survival.atp);
 
-  atpBar.style.width = `${Math.round(gameState.survival.atp)}%`;
-  atpValText.textContent = `${Math.round(gameState.survival.atp)} mmol`;
+  o2Bar.style.width = `${o2Val}%`;
+  o2ValText.textContent = `${o2Val}%`;
+
+  atpBar.style.width = `${atpVal}%`;
+  atpValText.textContent = `${atpVal} mmol`;
+
+  // 잔여 산소(O₂)나 세포 ATP가 65 이하로 내려가면 위험 점멸 표시
+  const isO2Critical = o2Val <= 65;
+  const isAtpCritical = atpVal <= 65;
+
+  if (o2MetricRow) o2MetricRow.classList.toggle('critical-vital', isO2Critical);
+  if (atpMetricRow) atpMetricRow.classList.toggle('critical-vital', isAtpCritical);
+
+  if (bioVitalWarning) {
+    if (isO2Critical || isAtpCritical) {
+      bioVitalWarning.classList.remove('hidden');
+      if (isO2Critical && isAtpCritical) {
+        bioVitalWarning.textContent = '🚨 HYPOXIA & ATP DEPLETION : 산소·ATP 고갈 위험!';
+      } else if (isO2Critical) {
+        bioVitalWarning.textContent = '⚠️ HYPOXIA ALERT : 잔여 산소(O₂) 부족 위험!';
+      } else {
+        bioVitalWarning.textContent = '⚠️ ATP DEPLETION : 세포 ATP 에너지 부족 위험!';
+      }
+    } else {
+      bioVitalWarning.classList.add('hidden');
+    }
+  }
 }
 
 function tickStage3Survival(now) {
@@ -1151,22 +1222,40 @@ function tickStage3Survival(now) {
   const elapsedSec = (now - gameState.survival.lastTick) / 1000;
   if (elapsedSec >= 1.2) {
     gameState.survival.lastTick = now;
-    gameState.survival.zombieDist = Math.max(3.5, gameState.survival.zombieDist - 0.55);
-    gameState.survival.o2 = Math.max(15, gameState.survival.o2 - 0.25);
-    gameState.survival.atp = Math.max(15, gameState.survival.atp - 0.3);
+    gameState.survival.zombieDist = Math.max(3.5, gameState.survival.zombieDist - 0.65);
+    gameState.survival.o2 = Math.max(15, gameState.survival.o2 - 0.45);
+    gameState.survival.atp = Math.max(15, gameState.survival.atp - 0.52);
 
-    if (gameState.survival.zombieDist < 25) {
+    // 산소나 ATP가 낮거나 좀비가 가까울 때 심장박동 사운드 재생
+    if (
+      gameState.survival.zombieDist < 42 ||
+      gameState.survival.o2 <= 60 ||
+      gameState.survival.atp <= 60
+    ) {
       playSound('heartbeat');
+    }
+
+    // 좀비가 접근할수록 주기적으로 강화유리창을 강타하여 창문이 깨지고 연구소가 흔들리는 효과
+    const impactInterval = gameState.survival.zombieDist < 35 ? 5200 : 8500;
+    if (
+      gameState.survival.zombieDist < 72 &&
+      now - gameState.survival.lastImpactTime > impactInterval &&
+      Math.random() < 0.45
+    ) {
+      gameState.survival.lastImpactTime = now;
+      triggerLabImpactShake();
+      showToast('💥 쾅! 콰직! — 좀비가 가까워지며 중앙 강화유리창에 금이 가고 연구소가 흔들립니다!', 2600);
     }
 
     // 만약 좀비 거리가 4m 이하까지 줄어들면 비상 방어막이 발동하며 긴장감 연출(게임이 막히지 않도록 배려)
     if (gameState.survival.zombieDist <= 4.0) {
       playSound('glitch');
+      triggerLabImpactShake();
       glitchOverlay.classList.remove('hidden');
       setTimeout(() => glitchOverlay.classList.add('hidden'), 450);
       gameState.survival.zombieDist = 28.0;
-      gameState.survival.o2 = Math.max(40, gameState.survival.o2);
-      gameState.survival.atp = Math.max(40, gameState.survival.atp);
+      gameState.survival.o2 = Math.max(45, gameState.survival.o2);
+      gameState.survival.atp = Math.max(45, gameState.survival.atp);
       showToast('⚡ 비상 전자기 충격파 가동! 격리문 앞 감염체들을 일시적으로 밀어냈습니다! 서둘러 암호를 푸세요!');
     }
 
@@ -1431,11 +1520,168 @@ function drawPlayerSprite(p, time) {
   ctx.restore();
 }
 
+// -------------------------------------------------------------------------
+// STAGE 3 시각적 공포 효과:
+// 1) 좀비가 접근할수록 중앙 대형 관찰창 유리가 단계별로 깨지는 균열(Cracks) 효과
+// 2) 잔여 산소(O₂)와 세포 ATP가 줄어들수록 화면 가장자리 적색 맥박·저산소 시야 협착 위험 효과
+// -------------------------------------------------------------------------
+function drawWindowCrackNetwork(cx, cy, scale, alpha, isImpactFlash) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+
+  ctx.strokeStyle = isImpactFlash
+    ? `rgba(254, 202, 202, ${Math.min(1, alpha + 0.3).toFixed(2)})`
+    : `rgba(226, 232, 240, ${alpha.toFixed(2)})`;
+  ctx.shadowColor = isImpactFlash ? '#ef4444' : 'rgba(56, 189, 248, 0.7)';
+  ctx.shadowBlur = isImpactFlash ? 16 : 6;
+  ctx.lineWidth = isImpactFlash ? 2.4 : 1.6;
+
+  // 방사형 주 균열선
+  const branches = [
+    [0, 0, -28, -22, -64, -48],
+    [0, 0, 32, -18, 72, -42],
+    [0, 0, 26, 24, 58, 56],
+    [0, 0, -30, 20, -68, 46],
+    [0, 0, 6, -34, 14, -70],
+    [0, 0, -10, 32, -22, 68],
+    [0, 0, 40, 4, 82, 12],
+  ];
+
+  ctx.beginPath();
+  for (const [x0, y0, x1, y1, x2, y2] of branches) {
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
+  ctx.stroke();
+
+  // 거미줄 동심원 연결 균열선
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(-28, -22);
+  ctx.lineTo(6, -34);
+  ctx.lineTo(32, -18);
+  ctx.lineTo(40, 4);
+  ctx.lineTo(26, 24);
+  ctx.lineTo(-10, 32);
+  ctx.lineTo(-30, 20);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawStage3VisualDangerEffects(now) {
+  if (gameState.stage !== 3) return;
+
+  const dist = gameState.survival.zombieDist;
+  // 좀비 접근 비율 (85m -> 0%, 10m -> 100%)
+  const zombieApproachRatio = Math.max(0, Math.min(1, (85 - dist) / 75));
+  const isFlash = gameState.survival.windowImpactFlash > 0.05;
+
+  // 1) 좀비가 접근할수록 중앙 관찰창(x: 430~645, y: 145~345) 유리가 점점 더 많이 깨지는 효과
+  if (zombieApproachRatio > 0.08 || isFlash) {
+    const baseAlpha = Math.min(0.92, 0.28 + zombieApproachRatio * 0.65);
+
+    // 1단계 균열 (78m 이하부터 좌측 창문 균열 생성)
+    drawWindowCrackNetwork(465, 235, 0.75 + zombieApproachRatio * 0.35, baseAlpha, isFlash);
+
+    // 2단계 균열 (58m 이하부터 우측 상단 대형 균열 추가)
+    if (dist < 58 || isFlash) {
+      drawWindowCrackNetwork(595, 210, 0.85 + zombieApproachRatio * 0.4, baseAlpha, isFlash);
+    }
+
+    // 3단계 균열 (40m 이하부터 중앙 하단 관통 균열 추가)
+    if (dist < 40) {
+      drawWindowCrackNetwork(530, 285, 1.05 + zombieApproachRatio * 0.35, baseAlpha, isFlash);
+    }
+
+    // 4단계 균열 (24m 이하 위기 상황: 유리창 전체에 붉은 경보 균열 확산)
+    if (dist < 24) {
+      drawWindowCrackNetwork(435, 295, 0.9, 0.9, true);
+      drawWindowCrackNetwork(625, 275, 0.95, 0.9, true);
+    }
+  }
+
+  if (gameState.survival.windowImpactFlash > 0.01) {
+    gameState.survival.windowImpactFlash *= 0.9;
+  }
+
+  // 2) 잔여 산소(O₂)와 세포 ATP가 줄어들수록 위험하다는 시각 효과 (저산소 시야 협착 + 붉은 심장박동 비네팅 + 경고 배너)
+  const o2Deficit = Math.max(0, (85 - gameState.survival.o2) / 70);   // 0 ~ 1
+  const atpDeficit = Math.max(0, (85 - gameState.survival.atp) / 70); // 0 ~ 1
+  const vitalDanger = Math.max(o2Deficit, atpDeficit);
+
+  if (vitalDanger > 0.05) {
+    ctx.save();
+    const pulseSpeed = 0.004 + vitalDanger * 0.008;
+    const pulseWave = (Math.sin(now * pulseSpeed) + 1) * 0.5; // 0 ~ 1
+
+    // 화면 가장자리가 붉고 어둡게 조여오는 저산소·ATP 고갈 터널 시야(Tunnel Vision) 효과
+    const innerRadius = Math.max(160, 440 - vitalDanger * 220 - pulseWave * 35);
+    const outerRadius = 720;
+    const vignetteGrad = ctx.createRadialGradient(
+      canvas.width / 2,
+      canvas.height / 2,
+      innerRadius,
+      canvas.width / 2,
+      canvas.height / 2,
+      outerRadius
+    );
+
+    const redAlpha = Math.min(0.82, vitalDanger * 0.55 + pulseWave * vitalDanger * 0.28);
+    vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignetteGrad.addColorStop(0.55, `rgba(127, 29, 29, ${(redAlpha * 0.45).toFixed(3)})`);
+    vignetteGrad.addColorStop(1, `rgba(20, 2, 5, ${redAlpha.toFixed(3)})`);
+
+    ctx.fillStyle = vignetteGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // ATP/산소가 65 이하일 때 화면 테두리 적색 위험 펄스 라인 및 상단 경고 텍스트 렌더링
+    if (gameState.survival.o2 <= 65 || gameState.survival.atp <= 65) {
+      ctx.strokeStyle = `rgba(248, 113, 113, ${(0.3 + pulseWave * 0.55).toFixed(2)})`;
+      ctx.lineWidth = 6 + vitalDanger * 6;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+      // 화면 하단 호흡/대사 위험 경고 홀로그램 바
+      ctx.font = '800 14px "JetBrains Mono", "Noto Sans KR", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(254, 202, 202, ${(0.55 + pulseWave * 0.45).toFixed(2)})`;
+      const warnText =
+        gameState.survival.o2 <= 50 || gameState.survival.atp <= 50
+          ? '🚨 [위험: 저산소증 & ATP 고갈 심각] 시야가 좁아지고 있습니다! 정답을 맞혀 산소와 ATP를 회복하세요!'
+          : '⚠️ [생체 경고] 잔여 산소(O₂) 및 세포 ATP 수치가 감소하고 있습니다!';
+      ctx.fillText(warnText, canvas.width / 2, canvas.height - 64);
+    }
+
+    ctx.restore();
+  }
+}
+
 function renderGame(now) {
   updatePlayerMovement();
   tickStage3Survival(now);
 
+  // 좀비가 매우 가까워지면(35m 이내) 연구소 전체에 미세한 지속 진동(Tremor) 발생
+  let shakeX = 0;
+  let shakeY = 0;
+  if (gameState.stage === 3) {
+    const dist = gameState.survival.zombieDist;
+    const impactBoost = gameState.survival.windowImpactFlash * 9;
+    const proximityTremor = dist < 40 ? ((40 - dist) / 40) * 2.6 : 0;
+    const totalShake = impactBoost + proximityTremor;
+    if (totalShake > 0.2) {
+      shakeX = (Math.random() - 0.5) * totalShake * 2;
+      shakeY = (Math.random() - 0.5) * totalShake * 2;
+    }
+  }
+
+  ctx.save();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (shakeX !== 0 || shakeY !== 0) {
+    ctx.translate(shakeX, shakeY);
+  }
 
   // 1) 아이소메트릭 배경 이미지 렌더링
   const bgImg = gameState.stage === 3 ? bgStage3 : bgStage1;
@@ -1446,18 +1692,21 @@ function renderGame(now) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
+  // 2) STAGE 3 좀비 접근에 따른 창문 깨짐(균열) & 산소/ATP 고갈 위험 시각 효과 렌더링
+  drawStage3VisualDangerEffects(now);
+
   const sector = getCurrentSectorData();
 
-  // 2) 플레이어 캐릭터 렌더링
+  // 3) 플레이어 캐릭터 렌더링
   drawPlayerSprite(gameState.player, now);
 
-  // 3) 조사 가능한 실험 장비마다 반짝이는 노란 느낌표 (!) 아이콘 렌더링
+  // 4) 조사 가능한 실험 장비마다 반짝이는 노란 느낌표 (!) 아이콘 렌더링
   for (const st of sector.stations) {
     const isSolved = gameState.solvedStations.has(st.id);
     drawExclamationIcon(st.x, st.y - 26, isSolved, !!st.isExitDoor, now);
   }
 
-  // 4) 캐릭터가 가까이가면 장비 바로 위에 검은색 [E] 키캡 배지 혹은 [SPACE]만 깔끔하게 표시
+  // 5) 캐릭터가 가까이가면 장비 바로 위에 검은색 [E] 키캡 배지 혹은 [SPACE]만 깔끔하게 표시
   if (gameState.nearestStation) {
     drawMinimalKeycapBadge(
       gameState.nearestStation.x,
@@ -1466,6 +1715,7 @@ function renderGame(now) {
     );
   }
 
+  ctx.restore();
   requestAnimationFrame(renderGame);
 }
 
