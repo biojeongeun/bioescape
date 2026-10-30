@@ -93,6 +93,30 @@
       </div>
     </div>
 
+    <!-- STAGE 1 시작 전 캐릭터 선택 화면 (여학생 연구원 / 남학생 연구원) -->
+    <div id="character-select-screen">
+      <div class="char-select-card">
+        <div class="char-select-badge">🧬 BIO-LAB ESCAPE RPG // CHARACTER SELECT</div>
+        <h1>생명과학 연구원 캐릭터 선택</h1>
+        <p class="char-select-desc">
+          연구소 안전 점검에 투입될 연구원을 선택하세요.
+        </p>
+        <div class="char-select-grid">
+          <button type="button" class="char-option-card selected" id="select-female-btn" data-gender="female">
+            <canvas id="preview-female-canvas" width="96" height="128"></canvas>
+            <strong class="char-name">여성 연구원 (여학생)</strong>
+            <span class="char-role">생명과학 동아리 수석 연구원</span>
+          </button>
+          <button type="button" class="char-option-card" id="select-male-btn" data-gender="male">
+            <canvas id="preview-male-canvas" width="96" height="128"></canvas>
+            <strong class="char-name">남성 연구원 (남학생)</strong>
+            <span class="char-role">생명과학 동아리 선임 연구원</span>
+          </button>
+        </div>
+        <button type="button" id="start-stage1-btn">연구소 입장하기 [ENTER]</button>
+      </div>
+    </div>
+
     <!-- STAGE 2 : 생물실 선물 교환 코드 입력 화면 (평화로운 축하 화면 -> 입력 순간 글리치 공포 반전!) -->
     <div id="stage2-screen" class="hidden">
       <div class="stage2-card" id="stage2-card-box">
@@ -100,13 +124,13 @@
         <h1>생물실 선물 교환소</h1>
         <p class="stage2-desc">
           축하합니다! 평화로운 생명과학 연구소의 모든 기초 점검을 마쳤습니다.<br/>
-          방금 연구소에서 획득한 <strong>선물 교환 코드 [ <span id="stage2-earned-code">423</span> ]</strong> 또는 동아리 부스 안내원의 <strong>생물실 선물 코드</strong>를 아래에 입력하면 등급에 맞는 선물을 드립니다!
+          <strong>동아리 도우미가 준 선물 코드</strong>를 아래에 입력해 주세요!
         </p>
         <div class="gift-input-group">
-          <input type="text" id="gift-code-input" maxlength="6" placeholder="선물 코드 입력 (예: 423)" autocomplete="off" />
+          <input type="text" id="gift-code-input" maxlength="10" placeholder="선물 코드 입력" autocomplete="off" />
           <button id="gift-submit-btn">선물 교환하기</button>
         </div>
-        <p class="stage2-subhint">※ 부스 안내 학생에게 화면을 보여주거나 코드를 입력하고 [Enter]를 누르세요.</p>
+        <p class="stage2-subhint">※ 동아리 도우미에게 받은 선물 코드를 입력하고 [Enter] 또는 [선물 교환하기]를 누르세요.</p>
       </div>
 
       <!-- 글리치 반전 시퀀스 텍스트 오버레이 -->

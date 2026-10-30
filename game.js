@@ -43,7 +43,6 @@ const modalOptions = document.getElementById('modal-options');
 const modalFeedback = document.getElementById('modal-feedback');
 
 const stage2Screen = document.getElementById('stage2-screen');
-const stage2EarnedCode = document.getElementById('stage2-earned-code');
 const giftCodeInput = document.getElementById('gift-code-input');
 const giftSubmitBtn = document.getElementById('gift-submit-btn');
 const glitchSequenceScreen = document.getElementById('glitch-sequence-screen');
@@ -51,6 +50,13 @@ const glitchDynamicText = document.getElementById('glitch-Dynamic-Text');
 const glitchSubText = document.getElementById('glitch-Sub-Text');
 const glitchOverlay = document.getElementById('glitch-overlay');
 const ingameToast = document.getElementById('ingame-toast');
+
+const charSelectScreen = document.getElementById('character-select-screen');
+const selectFemaleBtn = document.getElementById('select-female-btn');
+const selectMaleBtn = document.getElementById('select-male-btn');
+const startStage1Btn = document.getElementById('start-stage1-btn');
+const previewFemaleCanvas = document.getElementById('preview-female-canvas');
+const previewMaleCanvas = document.getElementById('preview-male-canvas');
 
 const finalVictoryScreen = document.getElementById('final-victory-screen');
 const victoryStatsBox = document.getElementById('victory-stats-box');
@@ -727,8 +733,9 @@ const gameState = {
   solvedStations: new Set(),
   enteredCode: ['', '', ''],
   activeStation: null,
-  // 플레이어 캐릭터 상태 (2.5D RPG 연구원)
+  // 플레이어 캐릭터 상태 (오픈소스 LPC 도트 RPG 스타일 연구원: female / male)
   player: {
+    gender: 'female',
     x: 560,
     y: 625,
     vx: 0,
@@ -867,7 +874,44 @@ function canMoveTo(nx, ny) {
 // -------------------------------------------------------------------------
 // 키보드 및 마우스(클릭 이동/상호작용) 이벤트
 // -------------------------------------------------------------------------
+// STAGE 1 시작 전 캐릭터 선택 이벤트 핸들링
+function selectCharacterGender(gender) {
+  playSound('interact');
+  gameState.player.gender = gender;
+  if (selectFemaleBtn && selectMaleBtn) {
+    selectFemaleBtn.classList.toggle('selected', gender === 'female');
+    selectMaleBtn.classList.toggle('selected', gender === 'male');
+  }
+}
+
+if (selectFemaleBtn) {
+  selectFemaleBtn.addEventListener('click', () => selectCharacterGender('female'));
+}
+if (selectMaleBtn) {
+  selectMaleBtn.addEventListener('click', () => selectCharacterGender('male'));
+}
+if (startStage1Btn) {
+  startStage1Btn.addEventListener('click', () => {
+    playSound('correct');
+    if (charSelectScreen) charSelectScreen.classList.add('hidden');
+    showToast('💡 방향키(WASD) 또는 마우스 클릭으로 이동해 노란 느낌표(!) 장비를 조사하세요!');
+  });
+}
+
 window.addEventListener('keydown', (e) => {
+  // 캐릭터 선택 창이 열려 있을 때
+  if (charSelectScreen && !charSelectScreen.classList.contains('hidden')) {
+    if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+      selectCharacterGender('female');
+    } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+      selectCharacterGender('male');
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startStage1Btn.click();
+    }
+    return;
+  }
+
   // 모달이 열려 있을 때
   if (!terminalModal.classList.contains('hidden')) {
     if (e.key === 'Escape') {
@@ -1066,7 +1110,6 @@ function handleExitDoorSuccess() {
   if (gameState.stage === 1) {
     // STAGE 1 클리어 -> STAGE 2 생물실 선물 교환 코드 입력 화면으로 이동
     gameState.stage = 2;
-    stage2EarnedCode.textContent = STAGE_DATA.stage1.code.join('');
     giftCodeInput.value = '';
     stage2Screen.classList.remove('hidden');
     setTimeout(() => giftCodeInput.focus(), 150);
@@ -1149,6 +1192,7 @@ function triggerStage2GlitchTransition() {
     gameState.survival.o2 = 95;
     gameState.survival.atp = 92;
     gameState.survival.lastTick = performance.now();
+    gameState.survival.lastImpactTime = performance.now();
     updateSurvivalHudUI();
 
     showToast('🚨 [STAGE 3 돌입] 좀비가 연구소로 다가옵니다! 느낌표(!) 장비를 조사해 보안코드를 해독하세요!', 4500);
@@ -1219,6 +1263,13 @@ function tickStage3Survival(now) {
   if (gameState.stage !== 3) return;
   if (!finalVictoryScreen.classList.contains('hidden')) return;
 
+  // 동아리 학생들이 생물실 밖에서 정확히 10초마다 1번씩(10.0초 주기) 실제 "쾅!" 소리를 맞출 수 있도록 고정 10초 주기 설정!
+  if (now - gameState.survival.lastImpactTime >= 10000) {
+    gameState.survival.lastImpactTime = now;
+    triggerLabImpactShake();
+    showToast('💥 쾅! 콰직! — 외부 좀비가 강화유리창을 강타하여 창문에 금이 가고 연구소가 흔들립니다!', 2600);
+  }
+
   const elapsedSec = (now - gameState.survival.lastTick) / 1000;
   if (elapsedSec >= 1.2) {
     gameState.survival.lastTick = now;
@@ -1233,18 +1284,6 @@ function tickStage3Survival(now) {
       gameState.survival.atp <= 60
     ) {
       playSound('heartbeat');
-    }
-
-    // 좀비가 접근할수록 주기적으로 강화유리창을 강타하여 창문이 깨지고 연구소가 흔들리는 효과
-    const impactInterval = gameState.survival.zombieDist < 35 ? 5200 : 8500;
-    if (
-      gameState.survival.zombieDist < 72 &&
-      now - gameState.survival.lastImpactTime > impactInterval &&
-      Math.random() < 0.45
-    ) {
-      gameState.survival.lastImpactTime = now;
-      triggerLabImpactShake();
-      showToast('💥 쾅! 콰직! — 좀비가 가까워지며 중앙 강화유리창에 금이 가고 연구소가 흔들립니다!', 2600);
     }
 
     // 만약 좀비 거리가 4m 이하까지 줄어들면 비상 방어막이 발동하며 긴장감 연출(게임이 막히지 않도록 배려)
@@ -1294,7 +1333,11 @@ restartGameBtn.addEventListener('click', () => {
   gameState.player.y = 625;
   gameState.player.targetX = null;
   gameState.player.targetY = null;
-  showToast('✨ 새로운 도전자를 위해 STAGE 1 평화로운 생명과학 연구소로 초기화되었습니다.');
+
+  if (charSelectScreen) {
+    charSelectScreen.classList.remove('hidden');
+  }
+  showToast('✨ 다음 참여 학생을 위해 캐릭터 선택 및 STAGE 1 화면으로 초기화되었습니다.');
 });
 
 // -------------------------------------------------------------------------
@@ -1447,77 +1490,200 @@ function drawMinimalKeycapBadge(x, y, time) {
   ctx.restore();
 }
 
-// 2.5D RPG 연구원 캐릭터(하얀 실험 가운 + 보안 고글) 렌더링
-function drawPlayerSprite(p, time) {
-  const bob = (p.targetX !== null || keysPressed['w'] || keysPressed['a'] || keysPressed['s'] || keysPressed['d'] || keysPressed['arrowup'] || keysPressed['arrowdown'] || keysPressed['arrowleft'] || keysPressed['arrowright'])
-    ? Math.sin(p.walkFrame * 2) * 3.5
-    : Math.sin(time * 0.004) * 1.5;
+// -------------------------------------------------------------------------
+// 오픈소스 Liberated Pixel Cup (LPC, CC-BY-SA 3.0 / GPL 3.0) 규격 기반
+// 고해상도 도트 RPG 연구원(여학생 연구원 / 남학생 연구원) 픽셀 스프라이트 렌더러
+// -------------------------------------------------------------------------
+function drawLPCPixelResearcher(targetCtx, cx, footY, gender, dir, walkFrame, isMoving, isApocalypse, scale = 3.2) {
+  const step = isMoving ? Math.sin(walkFrame * 2.2) : 0;
+  const bob = isMoving ? Math.abs(Math.sin(walkFrame * 2.2)) * -1.5 : 0;
+  const legLeftOffset = Math.round(step * 2.2);
+  const legRightOffset = -legLeftOffset;
+  const armSwing = Math.round(step * 1.8);
 
-  const px = p.x;
-  const py = p.y;
+  targetCtx.save();
+  targetCtx.translate(cx, footY);
 
-  ctx.save();
+  // 바닥 도트 타원 그림자
+  targetCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  targetCtx.beginPath();
+  targetCtx.ellipse(0, 2, 7.5 * scale, 3 * scale, 0, 0, Math.PI * 2);
+  targetCtx.fill();
 
-  // 발밑 그림자 (아이소메트릭 타원)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-  ctx.beginPath();
-  ctx.ellipse(px, py + 4, 20, 9, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Stage 3에서는 플레이어 주변 손전등/바이오랜턴 후광 추가
-  if (gameState.stage === 3) {
-    const grad = ctx.createRadialGradient(px, py - 24, 10, px, py - 24, 130);
-    grad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+  // Stage 3 바이오랜턴 바닥 후광
+  if (isApocalypse && targetCtx === ctx) {
+    const grad = targetCtx.createRadialGradient(0, -14 * scale, 6, 0, -14 * scale, 42 * scale);
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.24)');
     grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(px, py - 24, 130, 0, Math.PI * 2);
-    ctx.fill();
+    targetCtx.fillStyle = grad;
+    targetCtx.beginPath();
+    targetCtx.arc(0, -14 * scale, 42 * scale, 0, Math.PI * 2);
+    targetCtx.fill();
   }
 
-  // 다리/신발
-  const legSwing = Math.sin(p.walkFrame * 2) * 4;
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(px - 9, py - 12 + (bob > 0 ? legSwing : 0), 7, 13);
-  ctx.fillRect(px + 2, py - 12 - (bob > 0 ? legSwing : 0), 7, 13);
+  // 도트 픽셀 헬퍼 (1유닛 = scale px, 중심 x=0, 바닥 y=0 기준)
+  function pxRect(ux, uy, uw, uh, color) {
+    targetCtx.fillStyle = color;
+    targetCtx.fillRect(
+      Math.round(ux * scale),
+      Math.round((uy + bob) * scale),
+      Math.ceil(uw * scale),
+      Math.ceil(uh * scale)
+    );
+  }
 
-  // 하얀 실험 가운 몸통
-  ctx.fillStyle = '#f8fafc';
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(px - 14, py - 38 + bob, 28, 28, 7);
-  ctx.fill();
-  ctx.stroke();
+  const eyeShift = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+  const isBack = dir === 'up';
 
-  // 가운 안쪽 청록색 바이오 셔츠 & 사원증
-  ctx.fillStyle = gameState.stage === 3 ? '#f43f5e' : '#0284c7';
-  ctx.fillRect(px - 4, py - 36 + bob, 8, 16);
-  ctx.fillStyle = '#fde047';
-  ctx.fillRect(px + 5, py - 29 + bob, 5, 6);
+  // 1) 여학생 연구원 뒤쪽 긴 머리 / 포니테일 레이어
+  if (gender === 'female') {
+    pxRect(-6, -24, 12, 8, '#2a1b2e'); // 뒷머리 볼륨
+    pxRect(-7, -20, 2, 7, '#2a1b2e');  // 좌측 옆머리 묶음
+    pxRect(5, -20, 2, 7, '#2a1b2e');   // 우측 옆머리 묶음
+  }
 
-  // 머리 (2D 도트/SD RPG 비율)
-  ctx.fillStyle = '#fde68a';
-  ctx.beginPath();
-  ctx.arc(px, py - 50 + bob, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // 2) 다리 & 연구실 구두 (슬림한 장신 도트 비율)
+  // 왼다리
+  pxRect(-4, -9 + legLeftOffset * 0.4, 3, 7, '#1e293b');
+  pxRect(-4, -8 + legLeftOffset * 0.4, 1, 6, '#334155'); // 바지 하이라이트
+  pxRect(-4.5, -2 + legLeftOffset * 0.4, 3.5, 2, '#0f172a'); // 신발
+  // 오른다리
+  pxRect(1, -9 + legRightOffset * 0.4, 3, 7, '#1e293b');
+  pxRect(1, -8 + legRightOffset * 0.4, 1, 6, '#334155');
+  pxRect(1, -2 + legRightOffset * 0.4, 3.5, 2, '#0f172a');
 
-  // 머리카락
-  ctx.fillStyle = '#1e1b4b';
-  ctx.beginPath();
-  ctx.arc(px, py - 54 + bob, 15.5, Math.PI * 0.95, Math.PI * 2.05);
-  ctx.fill();
+  // 3) 하얀 연구원 롱 가운(Lab Coat) & 이너 셔츠/타이
+  // 가운 자락 외곽선 (다크 슬레이트 도트 아웃라인)
+  pxRect(-6, -19, 12, 13, '#334155');
+  // 가운 메인 화이트 바디 & 명암
+  pxRect(-5, -18, 10, 11, '#f8fafc');
+  pxRect(-5, -18, 2, 11, '#e2e8f0'); // 좌측 음영
+  pxRect(3, -18, 2, 11, '#e2e8f0');  // 우측 음영
 
-  // 사이버 연구 고글 (방향에 따라 시선 이동)
-  const eyeOffsetX = p.dir === 'left' ? -4 : p.dir === 'right' ? 4 : 0;
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(px - 11 + eyeOffsetX, py - 53 + bob, 22, 7);
-  ctx.fillStyle = gameState.stage === 3 ? '#34d399' : '#38bdf8';
-  ctx.fillRect(px - 8 + eyeOffsetX, py - 51.5 + bob, 6, 4);
-  ctx.fillRect(px + 2 + eyeOffsetX, py - 51.5 + bob, 6, 4);
+  if (!isBack) {
+    // 이너 셔츠 & 넥타이/리본
+    pxRect(-2, -18, 4, 7, '#1e293b');
+    pxRect(-1, -18, 2, 5, isApocalypse ? '#f43f5e' : (gender === 'female' ? '#ec4899' : '#0284c7'));
+    // 가운 오픈 라인 & 하단 슬릿
+    pxRect(-1, -11, 2, 4, '#1e293b');
+    // 가슴 사원증(ID 카드) 도트 디테일
+    pxRect(2, -15, 2.5, 3, '#38bdf8');
+    pxRect(2, -16, 2.5, 1, '#fde047');
+  } else {
+    // 뒷모습 가운 허리 벨트 라인
+    pxRect(-4, -13, 8, 1.5, '#cbd5e1');
+  }
 
-  ctx.restore();
+  // 4) 양팔 (가운 소매 + 손 + 손목 바이오워치)
+  // 왼팔
+  pxRect(-7.5, -18 + armSwing * 0.3, 2.5, 8, '#334155');
+  pxRect(-7, -17.5 + armSwing * 0.3, 2, 7, '#f1f5f9');
+  pxRect(-7, -10.5 + armSwing * 0.3, 2, 2, '#fcd34d'); // 왼손
+  // 오른팔
+  pxRect(5, -18 - armSwing * 0.3, 2.5, 8, '#334155');
+  pxRect(5, -17.5 - armSwing * 0.3, 2, 7, '#f1f5f9');
+  pxRect(5, -11.5 - armSwing * 0.3, 2, 1.2, '#06b6d4'); // 청록 발광 바이오워치
+  pxRect(5, -10.5 - armSwing * 0.3, 2, 2, '#fcd34d'); // 오른손
+
+  // 5) 목 & 얼굴 (LPC 표준 정통 RPG 도트 헤드)
+  pxRect(-1.5, -20, 3, 2, '#eab308'); // 목 그림자
+  pxRect(-1.5, -20.5, 3, 1.5, '#fde68a');
+
+  // 머리 외곽 아웃라인
+  pxRect(-5.5, -29.5, 11, 9.5, '#1e1b4b');
+  // 얼굴 피부톤
+  pxRect(-4.5, -28.5, 9, 8, '#fef08a');
+  pxRect(-4.5, -23.5, 9, 3, '#fde68a'); // 볼/턱 소프트 셰이딩
+
+  if (!isBack) {
+    // 눈 (선명한 JRPG 도트 눈동자)
+    pxRect(-3 + eyeShift, -25.5, 1.8, 2.2, '#0f172a');
+    pxRect(1.2 + eyeShift, -25.5, 1.8, 2.2, '#0f172a');
+    pxRect(-2.6 + eyeShift, -25.3, 0.8, 0.9, '#ffffff'); // 눈 하이라이트
+    pxRect(1.6 + eyeShift, -25.3, 0.8, 0.9, '#ffffff');
+
+    // 여학생 속눈썹/블러셔 vs 남학생 짙은 눈썹
+    if (gender === 'female') {
+      pxRect(-3.8 + eyeShift, -23.5, 1.4, 0.8, '#fda4af');
+      pxRect(2.4 + eyeShift, -23.5, 1.4, 0.8, '#fda4af');
+    } else {
+      pxRect(-3.2 + eyeShift, -26.5, 2.2, 0.8, '#1e1b4b');
+      pxRect(1.0 + eyeShift, -26.5, 2.2, 0.8, '#1e1b4b');
+    }
+  }
+
+  // 6) 헤어스타일 & 이마 연구용 보안 고글
+  if (gender === 'female') {
+    // 여학생 연구원: 다크 브라운/블랙 단정한 뱅헤어 + 사이드 브레이드
+    pxRect(-5.5, -30.5, 11, 3.8, '#2a1b2e');
+    pxRect(-4.5, -29.8, 9, 1.5, '#4a304d'); // 머릿결 엔젤링 하이라이트
+    if (!isBack) {
+      pxRect(-5.5, -27.5, 2, 5.5, '#2a1b2e'); // 옆머리
+      pxRect(3.5, -27.5, 2, 5.5, '#2a1b2e');
+      pxRect(-2.5, -27.5, 5, 1.5, '#2a1b2e'); // 앞머리 시스루 뱅
+    } else {
+      pxRect(-5.5, -28.5, 11, 8, '#2a1b2e');
+    }
+  } else {
+    // 남학생 연구원: 네이비블랙 댄디 숏컷 도트 헤어
+    pxRect(-5.8, -30.8, 11.6, 4.2, '#0f172a');
+    pxRect(-4.5, -30.0, 9, 1.5, '#334155'); // 머릿결 하이라이트
+    if (!isBack) {
+      pxRect(-5.5, -27.2, 1.8, 3.2, '#0f172a');
+      pxRect(3.7, -27.2, 1.8, 3.2, '#0f172a');
+      pxRect(-3, -27.5, 2.5, 1.6, '#0f172a');
+      pxRect(0.8, -27.5, 2.2, 1.4, '#0f172a');
+    } else {
+      pxRect(-5.5, -28.5, 11, 6.5, '#0f172a');
+    }
+  }
+
+  // 이마 위에 올려 쓴 연구원 사이버 고글 (포인트 아이템)
+  pxRect(-5, -29.2, 10, 2.2, '#0f172a');
+  pxRect(-4.2, -28.8, 3.6, 1.4, isApocalypse ? '#34d399' : '#38bdf8');
+  pxRect(0.6, -28.8, 3.6, 1.4, isApocalypse ? '#34d399' : '#38bdf8');
+
+  targetCtx.restore();
+}
+
+function drawPlayerSprite(p, time) {
+  const isMoving =
+    p.targetX !== null ||
+    keysPressed['w'] ||
+    keysPressed['a'] ||
+    keysPressed['s'] ||
+    keysPressed['d'] ||
+    keysPressed['arrowup'] ||
+    keysPressed['arrowdown'] ||
+    keysPressed['arrowleft'] ||
+    keysPressed['arrowright'];
+
+  drawLPCPixelResearcher(
+    ctx,
+    p.x,
+    p.y,
+    p.gender || 'female',
+    p.dir,
+    p.walkFrame,
+    isMoving,
+    gameState.stage === 3,
+    3.1
+  );
+}
+
+// 캐릭터 선택 창 미리보기 캔버스 렌더링
+function renderCharacterSelectPreviews(now) {
+  if (!charSelectScreen || charSelectScreen.classList.contains('hidden')) return;
+  if (previewFemaleCanvas) {
+    const fCtx = previewFemaleCanvas.getContext('2d');
+    fCtx.clearRect(0, 0, previewFemaleCanvas.width, previewFemaleCanvas.height);
+    drawLPCPixelResearcher(fCtx, 48, 114, 'female', 'down', now * 0.003, true, false, 3.2);
+  }
+  if (previewMaleCanvas) {
+    const mCtx = previewMaleCanvas.getContext('2d');
+    mCtx.clearRect(0, 0, previewMaleCanvas.width, previewMaleCanvas.height);
+    drawLPCPixelResearcher(mCtx, 48, 114, 'male', 'down', now * 0.003, true, false, 3.2);
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -1660,6 +1826,7 @@ function drawStage3VisualDangerEffects(now) {
 }
 
 function renderGame(now) {
+  renderCharacterSelectPreviews(now);
   updatePlayerMovement();
   tickStage3Survival(now);
 
