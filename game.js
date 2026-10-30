@@ -57,6 +57,54 @@ const selectMaleBtn = document.getElementById('select-male-btn');
 const startStage1Btn = document.getElementById('start-stage1-btn');
 const previewFemaleCanvas = document.getElementById('preview-female-canvas');
 const previewMaleCanvas = document.getElementById('preview-male-canvas');
+const fullscreenToggleBtn = document.getElementById('fullscreen-toggle-btn');
+
+// -------------------------------------------------------------------------
+// 전체화면(Fullscreen API) 제어: 인터넷 탭·주소창을 숨기고 몰입형 전체화면 전환
+// -------------------------------------------------------------------------
+function enterBrowserFullscreen() {
+  try {
+    const docEl = document.documentElement;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      }
+    }
+  } catch (_) {}
+}
+
+function toggleBrowserFullscreen() {
+  try {
+    const docEl = document.documentElement;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  } catch (_) {}
+}
+
+function syncFullscreenBtnLabel() {
+  if (!fullscreenToggleBtn) return;
+  const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  fullscreenToggleBtn.textContent = isFull ? '⛶ 창모드' : '⛶ 전체화면';
+}
+
+document.addEventListener('fullscreenchange', syncFullscreenBtnLabel);
+document.addEventListener('webkitfullscreenchange', syncFullscreenBtnLabel);
+if (fullscreenToggleBtn) {
+  fullscreenToggleBtn.addEventListener('click', toggleBrowserFullscreen);
+}
 
 const finalVictoryScreen = document.getElementById('final-victory-screen');
 const victoryStatsBox = document.getElementById('victory-stats-box');
@@ -893,6 +941,7 @@ if (selectMaleBtn) {
 if (startStage1Btn) {
   startStage1Btn.addEventListener('click', () => {
     playSound('correct');
+    enterBrowserFullscreen();
     if (charSelectScreen) charSelectScreen.classList.add('hidden');
     showToast('💡 방향키(WASD) 또는 마우스 클릭으로 이동해 노란 느낌표(!) 장비를 조사하세요!');
   });
@@ -1152,6 +1201,7 @@ function triggerStage2GlitchTransition() {
     return;
   }
 
+  enterBrowserFullscreen();
   playSound('glitch');
   glitchOverlay.classList.remove('hidden');
   glitchSequenceScreen.classList.remove('hidden');
@@ -1263,8 +1313,8 @@ function tickStage3Survival(now) {
   if (gameState.stage !== 3) return;
   if (!finalVictoryScreen.classList.contains('hidden')) return;
 
-  // 동아리 학생들이 생물실 밖에서 정확히 10초마다 1번씩(10.0초 주기) 실제 "쾅!" 소리를 맞출 수 있도록 고정 10초 주기 설정!
-  if (now - gameState.survival.lastImpactTime >= 10000) {
+  // 동아리 학생들이 생물실 밖에서 정확히 40초마다 1번씩(30초~50초 사이의 정중앙 40.0초 주기) 실제 "쾅!" 소리를 맞출 수 있도록 고정 40초 주기 설정!
+  if (now - gameState.survival.lastImpactTime >= 40000) {
     gameState.survival.lastImpactTime = now;
     triggerLabImpactShake();
     showToast('💥 쾅! 콰직! — 외부 좀비가 강화유리창을 강타하여 창문에 금이 가고 연구소가 흔들립니다!', 2600);
