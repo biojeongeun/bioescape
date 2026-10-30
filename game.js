@@ -172,6 +172,114 @@ const bgStage3 = new Image();
 bgStage3.src = 'assets/stage3_apocalypse.jpg';
 
 // -------------------------------------------------------------------------
+// 실제 사람 비율(8등신 실사 3D) 하얀 연구원 가운 캐릭터 이미지 로드 & 배경 투명화(Flood-fill Keying)
+// -------------------------------------------------------------------------
+const rawResearcherImg = new Image();
+let researcherSpriteCanvas = null;
+
+rawResearcherImg.onload = () => {
+  const offCanvas = document.createElement('canvas');
+  const w = rawResearcherImg.naturalWidth;
+  const h = rawResearcherImg.naturalHeight;
+  offCanvas.width = w;
+  offCanvas.height = h;
+  const offCtx = offCanvas.getContext('2d');
+  offCtx.drawImage(rawResearcherImg, 0, 0);
+
+  const imgData = offCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  const visited = new Uint8Array(w * h);
+  const queue = new Int32Array(w * h);
+  let head = 0;
+  let tail = 0;
+
+  function isBgPixel(idx) {
+    const p = idx * 4;
+    const r = data[p];
+    const g = data[p + 1];
+    const b = data[p + 2];
+    return r < 24 && g < 24 && b < 24;
+  }
+
+  // 이미지 테두리 픽셀에서 시작해 외곽 검은 배경만 안전하게 제거 (검은 바지/신발/머리카락 내부 보존)
+  for (let x = 0; x < w; x++) {
+    const topIdx = x;
+    const botIdx = (h - 1) * w + x;
+    if (isBgPixel(topIdx)) { visited[topIdx] = 1; queue[tail++] = topIdx; }
+    if (isBgPixel(botIdx)) { visited[botIdx] = 1; queue[tail++] = botIdx; }
+  }
+  for (let y = 0; y < h; y++) {
+    const leftIdx = y * w;
+    const rightIdx = y * w + (w - 1);
+    if (!visited[leftIdx] && isBgPixel(leftIdx)) { visited[leftIdx] = 1; queue[tail++] = leftIdx; }
+    if (!visited[rightIdx] && isBgPixel(rightIdx)) { visited[rightIdx] = 1; queue[tail++] = rightIdx; }
+  }
+
+  while (head < tail) {
+    const curr = queue[head++];
+    data[curr * 4 + 3] = 0; // 완전 투명 처리
+
+    const cx = curr % w;
+    const cy = (curr / w) | 0;
+
+    const neighbors = [];
+    if (cx > 0) neighbors.push(curr - 1);
+    if (cx < w - 1) neighbors.push(curr + 1);
+    if (cy > 0) neighbors.push(curr - w);
+    if (cy < h - 1) neighbors.push(curr + w);
+
+    for (let i = 0; i < neighbors.length; i++) {
+      const nIdx = neighbors[i];
+      if (!visited[nIdx]) {
+        if (isBgPixel(nIdx)) {
+          visited[nIdx] = 1;
+          queue[tail++] = nIdx;
+        } else {
+          // 캐릭터 외곽선 안티앨리어싱 부드럽게 감쇠
+          const p = nIdx * 4;
+          const lum = (data[p] + data[p + 1] + data[p + 2]) / 3;
+          if (lum < 42) {
+            data[p + 3] = Math.min(data[p + 3], Math.round(((lum - 18) / 24) * 255));
+          }
+        }
+      }
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+
+  // 여백을 잘라내고 캐릭터 알맹이(Bounding Box)만 추출
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 20) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX > minX && maxY > minY) {
+    const cropW = maxX - minX + 1;
+    const cropH = maxY - minY + 1;
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = cropW;
+    cropCanvas.height = cropH;
+    cropCanvas.getContext('2d').drawImage(
+      offCanvas,
+      minX, minY, cropW, cropH,
+      0, 0, cropW, cropH
+    );
+    researcherSpriteCanvas = cropCanvas;
+  } else {
+    researcherSpriteCanvas = offCanvas;
+  }
+};
+rawResearcherImg.src = 'assets/researcher_realistic.jpg';
+
+// -------------------------------------------------------------------------
 // 아이소메트릭 방 바닥 이동 가능 다각형 및 중앙 실험대 투명 히트박스(충돌영역)
 // -------------------------------------------------------------------------
 const FLOOR_POLYGON = [
@@ -1464,7 +1572,7 @@ function drawMinimalKeycapBadge(x, y, time) {
   ctx.restore();
 }
 
-// 실사풍 배경에 어울리는 생물안전 방호복(HAZMAT) / 특수 연구원 캐릭터 렌더링
+// 실제 사람 비율(8등신 실사 3D) 하얀 연구원복 캐릭터 렌더링
 function drawPlayerSprite(p, time) {
   const isMoving =
     p.targetX !== null ||
@@ -1478,8 +1586,10 @@ function drawPlayerSprite(p, time) {
     keysPressed['arrowright'];
 
   const bob = isMoving
-    ? Math.sin(p.walkFrame * 2) * 3.2
-    : Math.sin(time * 0.004) * 1.2;
+    ? Math.abs(Math.sin(p.walkFrame * 1.8)) * -5.5
+    : Math.sin(time * 0.0035) * 1.5;
+
+  const tilt = isMoving ? Math.sin(p.walkFrame * 1.8) * 0.032 : 0;
 
   const px = p.x;
   const py = p.y;
@@ -1487,107 +1597,48 @@ function drawPlayerSprite(p, time) {
   ctx.save();
 
   // 1) 바닥 리얼 소프트 그림자
-  const shadowGrad = ctx.createRadialGradient(px, py + 4, 3, px, py + 4, 28);
-  shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.78)');
+  const shadowGrad = ctx.createRadialGradient(px, py + 2, 4, px, py + 2, 34);
+  shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.72)');
+  shadowGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.32)');
   shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = shadowGrad;
   ctx.beginPath();
-  ctx.ellipse(px, py + 4, 26, 11, 0, 0, Math.PI * 2);
+  ctx.ellipse(px, py + 2, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2) 전술 부츠 & 다리
-  const legSwing = isMoving ? Math.sin(p.walkFrame * 2) * 4.5 : 0;
-  ctx.fillStyle = '#0f172a';
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(px - 10, py - 18 + legSwing, 8, 19, 3);
-  ctx.roundRect(px + 2, py - 18 - legSwing, 8, 19, 3);
-  ctx.fill();
-  ctx.stroke();
-
-  // 3) 산소통(SCBA 백팩) — Stage 3에서는 등 뒤에 LED 잔량 게이지 발광
-  ctx.fillStyle = '#1e293b';
-  ctx.beginPath();
-  ctx.roundRect(px - 16, py - 46 + bob, 32, 24, 5);
-  ctx.fill();
-  ctx.strokeStyle = gameState.stage === 3 ? '#10b981' : '#38bdf8';
-  ctx.stroke();
-
-  // 4) 생물안전 방호복(Stage 3: 다크 택티컬 해즈맷 슈트 / Stage 1: 실사 다크네이비 바이오 연구복)
-  const suitGrad = ctx.createLinearGradient(px - 14, py - 48 + bob, px + 14, py - 14 + bob);
+  // 2) Stage 3에서는 연구원 손목 바이오워치/랜턴의 은은한 바닥 반사광 추가
   if (gameState.stage === 3) {
-    suitGrad.addColorStop(0, '#334155');
-    suitGrad.addColorStop(0.5, '#1e293b');
-    suitGrad.addColorStop(1, '#090d16');
-  } else {
-    suitGrad.addColorStop(0, '#e2e8f0');
-    suitGrad.addColorStop(0.6, '#cbd5e1');
-    suitGrad.addColorStop(1, '#64748b');
+    const glowGrad = ctx.createRadialGradient(px, py - 65, 6, px, py - 65, 95);
+    glowGrad.addColorStop(0, 'rgba(56, 189, 248, 0.18)');
+    glowGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(px, py - 65, 95, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.fillStyle = suitGrad;
-  ctx.strokeStyle = gameState.stage === 3 ? '#475569' : '#334155';
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.roundRect(px - 14, py - 47 + bob, 28, 32, 8);
-  ctx.fill();
-  ctx.stroke();
 
-  // 가슴 바이오 해저드/보안 배지 및 전술 하네스 라인
-  ctx.strokeStyle = gameState.stage === 3 ? 'rgba(244, 63, 94, 0.7)' : 'rgba(2, 132, 199, 0.75)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(px - 9, py - 45 + bob);
-  ctx.lineTo(px - 4, py - 18 + bob);
-  ctx.moveTo(px + 9, py - 45 + bob);
-  ctx.lineTo(px + 4, py - 18 + bob);
-  ctx.stroke();
+  // 3) 8등신 실사 연구원 스프라이트 렌더링 (높이 약 168px로 연구실 비율과 완벽 조화)
+  if (researcherSpriteCanvas) {
+    const targetH = 168;
+    const aspect = researcherSpriteCanvas.width / researcherSpriteCanvas.height;
+    const targetW = targetH * aspect;
 
-  // 가슴 손전등 코어 라이트
-  ctx.fillStyle = gameState.stage === 3 ? '#fef08a' : '#38bdf8';
-  ctx.shadowColor = gameState.stage === 3 ? '#fde047' : '#38bdf8';
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  ctx.arc(px, py - 33 + bob, 3.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
+    ctx.translate(px, py + bob);
+    ctx.rotate(tilt);
 
-  // 5) 방호 헬멧 & 반사 바이저 (도트 느낌 없는 리얼 메탈릭 바이저)
-  const headGrad = ctx.createRadialGradient(px - 4, py - 62 + bob, 2, px, py - 58 + bob, 16);
-  if (gameState.stage === 3) {
-    headGrad.addColorStop(0, '#475569');
-    headGrad.addColorStop(1, '#0f172a');
-  } else {
-    headGrad.addColorStop(0, '#f8fafc');
-    headGrad.addColorStop(1, '#64748b');
+    // 원본 캐릭터는 좌측 전방을 바라보므로, 오른쪽 이동 시 좌우 반전
+    if (p.dir === 'right') {
+      ctx.scale(-1, 1);
+    }
+
+    ctx.drawImage(
+      researcherSpriteCanvas,
+      -targetW / 2,
+      -targetH + 6,
+      targetW,
+      targetH
+    );
   }
-  ctx.fillStyle = headGrad;
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(px, py - 58 + bob, 14.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // 헬멧 전면 유리 바이저 (시선 방향 반영)
-  const eyeOffsetX = p.dir === 'left' ? -3.5 : p.dir === 'right' ? 3.5 : 0;
-  const visorGrad = ctx.createLinearGradient(px - 10, py - 63 + bob, px + 10, py - 53 + bob);
-  if (gameState.stage === 3) {
-    visorGrad.addColorStop(0, '#064e3b');
-    visorGrad.addColorStop(0.5, '#10b981');
-    visorGrad.addColorStop(1, '#022c22');
-  } else {
-    visorGrad.addColorStop(0, '#0369a1');
-    visorGrad.addColorStop(0.5, '#38bdf8');
-    visorGrad.addColorStop(1, '#0f172a');
-  }
-  ctx.fillStyle = visorGrad;
-  ctx.strokeStyle = gameState.stage === 3 ? '#34d399' : '#7dd3fc';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.roundRect(px - 10 + eyeOffsetX, py - 63 + bob, 20, 9.5, 4);
-  ctx.fill();
-  ctx.stroke();
 
   ctx.restore();
 }
@@ -1658,7 +1709,7 @@ function drawStage3FlashlightDarkness(now) {
   if (gameState.stage !== 3 || !gameState.flashlightEnabled) return;
 
   const px = gameState.player.x;
-  const py = gameState.player.y - 38;
+  const py = gameState.player.y - 84;
 
   // 플레이어 위치와 마우스 커서 위치를 보간해 자연스러운 손전등 조사 중심점 생성
   const aimX = px + (gameState.mouseX - px) * 0.38;
